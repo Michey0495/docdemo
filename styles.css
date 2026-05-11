@@ -93,7 +93,7 @@ code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; }
   font-size: 17px;
   font-weight: 700;
   color: var(--ink);
-  margin-bottom: 32px;
+  margin-bottom: 20px;
   line-height: 1.4;
 }
 .rail-list {
@@ -149,6 +149,48 @@ code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; }
 }
 .rail-item.active .rail-num { color: var(--red); }
 .rail-item.active .rail-name { color: var(--ink); font-weight: 700; }
+
+.rail-swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 28px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--ink-2);
+  border-radius: 999px;
+  transition: all var(--t);
+}
+.rail-swap:hover {
+  background: var(--ink);
+  color: white;
+  border-color: var(--ink);
+}
+.rail-swap-arrow {
+  width: 10px; height: 10px;
+  position: relative;
+}
+.rail-swap-arrow::before,
+.rail-swap-arrow::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+.rail-swap-arrow::before {
+  top: 0; right: 0;
+  width: 8px; height: 1.5px;
+}
+.rail-swap-arrow::after {
+  top: 0; right: 0;
+  width: 1.5px; height: 8px;
+}
+@media (max-width: 920px) {
+  .rail-swap { margin-bottom: 8px; }
+}
 
 /* ============================================
    Hero
