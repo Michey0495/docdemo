@@ -263,6 +263,8 @@ function renderPhase(phase, index) {
     $('.phase-toggle-label', toggleBtn).textContent = isOpen ? '詳細を閉じる' : '詳細を見る';
   });
 
+  const livePreviewBlock = phase.livePreview ? renderLivePreview(phase.livePreview) : null;
+
   return h('section', { class: 'phase', id: `phase-${index}`, dataset: { index } }, [
     h('div', { class: 'phase-head' }, [
       h('div', { class: 'phase-row1' }, [
@@ -280,8 +282,43 @@ function renderPhase(phase, index) {
         h('div', { class: 'flow-step-detail' }, step.detail),
       ])
     )),
+    livePreviewBlock,
     h('div', { class: 'phase-toggle-wrap' }, toggleBtn),
     detail,
+  ]);
+}
+
+// ---- live preview (完成版アプリ) ----
+function renderLivePreview(preview) {
+  const ctaIcon = h('span', { class: 'live-preview-cta-icon', 'aria-hidden': 'true' });
+  return h('div', { class: 'live-preview' }, [
+    h('div', { class: 'live-preview-body' }, [
+      h('div', { class: 'live-preview-text' }, [
+        h('div', { class: 'live-preview-tag' }, '完成版プレビュー'),
+        h('div', { class: 'live-preview-title' }, preview.title),
+        h('p', { class: 'live-preview-desc' }, preview.description),
+        h('a', {
+          class: 'live-preview-cta',
+          href: preview.url,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+        }, [preview.cta, ctaIcon]),
+      ]),
+      h('a', {
+        class: 'live-preview-figure',
+        href: preview.url,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        'aria-label': preview.cta,
+      }, [
+        h('img', {
+          src: preview.image,
+          alt: preview.imageAlt || preview.title,
+          loading: 'lazy',
+        }),
+        h('span', { class: 'live-preview-figure-overlay' }, '別タブで開く'),
+      ]),
+    ]),
   ]);
 }
 

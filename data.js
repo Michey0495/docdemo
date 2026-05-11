@@ -1006,6 +1006,14 @@ sequenceDiagram
     sub: 'Hooksでガードレールを敷きつつストーリー単位で実装',
     duration: '約4日（並走）',
     outcome: 'PR #41-#76 / 36ストーリー / 自動修正適用済',
+    livePreview: {
+      title: '完成版を実際に操作する',
+      description: '本工程で実装したアプリの動作デモを別タブで開けます。AI駆動開発12テーマを通して、Claude Code がどのような成果物を作り出すかを画面ごと確認できます。',
+      image: 'assets/app-preview.png',
+      imageAlt: '完成版アプリのトップ画面',
+      url: 'https://ai-dev-demo.ezoai.jp',
+      cta: 'アプリを新規タブで開く',
+    },
     flow: {
       input:     { label: 'design/detail/',         detail: '詳細設計書' },
       operation: { label: '/implement-feature',     detail: 'ストーリー単位で実装' },
