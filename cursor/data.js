@@ -1,0 +1,1838 @@
+// ===== 架空案件のシナリオ =====
+const PROJECT = {
+  client: '架空株式会社（フィクション）',
+  industry: '電子部品の専門商社・東京3拠点',
+  employees: '社員120名',
+  brief: '20年もののExcel在庫管理を刷新し、東京3拠点（本社千代田・物流センター江東・物流センター大田）でリアルタイムに動く在庫管理システムを構築したい。バーコードによる入出庫、スマホ照会、既存販売管理とのCSV連携が必須。予算は年額1,500万円以内。',
+  meta: [
+    { label: 'ヒアリング', value: '90分・3名' },
+    { label: '対象拠点', value: '東京3拠点' },
+    { label: '想定リリース', value: '6ヶ月後' },
+    { label: '予算枠', value: '1,500万円/年' },
+  ],
+};
+
+// kind: 'knowledge' | 'harness' | 'hook' | 'subagent' | 'skill' | 'mcp' | 'command'
+const KIND_LABEL = {
+  knowledge: 'Project Rules（.cursor/rules/*.mdc）',
+  harness:   'ワークスペース設定（.cursor/settings.json）',
+  hook:      'ガードレール（husky + lint-staged）',
+  subagent:  'Custom Mode（.cursor/modes/*.json）',
+  skill:     'Notepad（~/.cursor/notepads/*.md）',
+  mcp:       'MCPサーバー（.cursor/mcp.json）',
+  command:   'ワークフロー Notepad（.cursor/notepads/*.md）',
+};
+
+// ===== 工程データ =====
+const PHASES = [
+
+  // ───────────────────────── 01 ─────────────────────────
+  {
+    num: '01',
+    title: 'ヒアリング解析',
+    sub: '文字起こしから要求を構造化抽出',
+    duration: '約3分',
+    outcome: '機能要求48件・非機能要求12件・制約7件・ステークホルダー4名を一括抽出',
+    flow: {
+      input:     { label: 'ヒアリング文字起こし', detail: 'TXT 約20,000字 / 90分' },
+      operation: { label: '@extract-requirements', detail: 'Notepad 参照' },
+      config:    { label: 'req-extractor mode',    detail: 'Custom Mode 定義' },
+      output:    { label: 'requirements-raw.md',   detail: '要求一覧（生）' },
+    },
+    artifactsIn: [
+      {
+        name: 'transcripts/kakuu-2026-04-15.txt',
+        lang: 'text',
+        body:
+`[架空株式会社 ヒアリング文字起こし 抜粋]
+00:14:32 田中物流部長: 在庫数の確認に毎日2時間かかってる。Excel台帳が3つあって、どれが最新か誰もわからない。
+00:18:05 佐藤情シス: 既存の販売管理システムは20年もの。改修は厳しい。
+00:23:11 山本社長: スマホからリアルタイムで在庫が見られたら理想的。営業先で即答できる。
+00:31:48 田中物流部長: バーコード読み取りで入出庫を打てると現場が楽。
+00:42:22 佐藤情シス: 既存システムとはCSV連携でいい。リアルタイム連携はオーバースペック。
+00:51:09 山本社長: 予算は年額1,500万、内製は無理。
+01:02:15 田中物流部長: 拠点は千代田の本社、江東と大田の物流センター。3拠点で同時に動かしたい。
+01:18:40 佐藤情シス: Oracle 11gが裏にいる。直接触らせるのは無理。CSVで日次が現実的。
+01:24:03 山本社長: 営業時間中は止まってほしくない。深夜のメンテは構わない。
+01:31:55 田中物流部長: 棚卸しは年4回。差異が出たら原因を追えるようにしたい。`,
+      },
+    ],
+    configFiles: [
+      {
+        kind: 'knowledge',
+        path: '.cursor/rules/req-engineering.mdc',
+        lang: 'mdc',
+        body:
+`---
+description: 要求工学フェーズで Cursor Agent が従う規約。要求抽出・分類・トレーサビリティの3点をカバー
+globs: ["docs/**/*.md", "transcripts/**/*.txt"]
+alwaysApply: false
+---
+# 要求工学 - プロジェクト規約
+
+## 用語
+- 機能要求(FR) / 非機能要求(NFR) / 制約(CON)
+- ステークホルダーは「役割 / 関心事 / 権限」の3項で記述
+
+## トレーサビリティ
+- すべての要求に発言者・タイムスタンプ・確信度を保持
+- 後工程で要求IDから一次ソース（文字起こし行）に辿れること
+
+## 抽出のお作法
+- 計測不能な要求は「要具体化」フラグ
+- 暗黙要求は (推定) を本文に明示
+- 否定の発言（〜は不要）も要求として残す
+
+> Project Rules は Settings > Cursor Settings > Rules で確認可能。globs にマッチしたファイルが開かれた瞬間にこの規約が自動でコンテキストに注入される。`,
+      },
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/req-extractor.json',
+        lang: 'json',
+        body:
+`{
+  "name": "要求抽出モード",
+  "description": "顧客ヒアリング文字起こしから機能要求/非機能要求/制約/ステークホルダーを構造化抽出する",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "edit_file", "codebase_search"],
+  "autoRun": false,
+  "instructions": "あなたは要求工学の専門家です。\n\n入力: ヒアリング文字起こしテキスト\n出力: 以下を持つMarkdown\n\n# 機能要求\n| ID | 要求 | 発言者 | TS | 確信度(高/中/低) |\n\n# 非機能要求\n| ID | 要求 | 種別(性能/可用/セキュ/運用/UX) | 発言者 |\n\n# 制約条件\n- 予算 / スケジュール / 既存システム / 法令\n\n# ステークホルダー\n- 役割 / 関心事 / 権限 / 連絡先\n\n抽出ルール:\n- 発言の根拠タイムスタンプを必ず保持\n- 計測不能な要求は「要具体化」フラグを付与\n- 暗黙要求は (推定) を本文に明示\n- 入力20,000字超の場合は5,000字単位で分割処理しコンテキストを節約"
+}`,
+      },
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/req-reviewer.json',
+        lang: 'json',
+        body:
+`{
+  "name": "要求レビューモード",
+  "description": "抽出済み要求一覧をレビューし、計測不能・重複・暗黙要求を検出",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "codebase_search"],
+  "autoRun": true,
+  "instructions": "チェック観点:\n1. 計測不能な要求（「使いやすい」「かっこよく」等）\n2. 重複 / 矛盾要求\n3. ステークホルダー別の網羅性（権限者ごとに最低1件）\n4. 暗黙要求の取りこぼし（特にセキュリティ / 法令 / アクセシビリティ）\n\n出力: [INFO]/[WARN]/[ERROR] + 該当ID + 提案"
+}`,
+      },
+      {
+        kind: 'command',
+        path: '.cursor/notepads/extract-requirements.md',
+        lang: 'md',
+        body:
+`---
+description: 文字起こしtxtを「要求抽出モード」で解析し、「要求レビューモード」で自動レビューまで完走するワークフロー
+---
+# 要求抽出パイプライン
+
+Agent Mode で \`@extract-requirements <transcript-path>\` と打つと、このNotepadが Agent のコンテキストに展開される。
+
+## 手順
+1. 「要求抽出モード」(.cursor/modes/req-extractor.json) に切替、指定パスを解析
+2. docs/01-requirements-raw.md を出力したら「要求レビューモード」に切替
+3. 同ファイルを点検し、WARN/ERROR があれば次工程に進まず人間に提示
+
+## モード切替
+- Agent Mode 右上のモード選択メニュー、または Cmd+. で切替
+- Custom Mode は .cursor/modes/ 配下を Settings > Modes から有効化`,
+      },
+    ],
+    bestPractices: [
+      { title: '一次ソースの保持を最優先', body: '発言者ラベルとタイムスタンプは「監査の根拠」。後工程で要求IDからヒアリング行に1秒で遡れる構造を最初に作る。' },
+      { title: '確信度ラベルで「あいまいさ」を可視化', body: '確信度(高/中/低)を要求テーブルに混ぜず別カラムで管理。MoSCoW分類のときに迷い処理が高速化する。' },
+      { title: '長文入力は分割処理', body: '20,000字超のtxtはエージェント側で分割。コンテキストを圧迫すると後段の精度が下がる。' },
+      { title: '抽出後すぐにレビューエージェント', body: '別エージェント(req-reviewer)で点検する二段構え。同じ思考で書いた本人レビューより精度が出る。' },
+    ],
+    officialRefs: [
+      { label: 'Custom Modes（Cursor 公式機能）', body: 'Cursor 0.49+ で .cursor/modes/*.json または Settings から作成可能。Agent Mode のモード選択メニュー (Cmd+.) からツール・モデル・指示文を切替。' },
+      { label: '.cursor/rules/*.mdc（Project Rules）', body: 'プロジェクトルートに置くと Cursor が起動時に自動読み込み。frontmatter の globs にマッチしたファイルが開かれた瞬間に該当ルールがコンテキストに自動注入。alwaysApply: true で常時適用。' },
+      { label: 'Cursor公式ドキュメント: Rules', body: 'docs.cursor.com/context/rules を参照。MDC形式の frontmatter は description / globs / alwaysApply の3点。User Rules は Settings > Rules で全プロジェクト共通として設定。' },
+    ],
+    execution: {
+      command: '@extract-requirements transcripts/kakuu-2026-04-15.txt',
+      lines: [
+        '> @extract-requirements Notepad を Agent Mode に読込',
+        '  Step 1: 「要求抽出モード」に切替',
+        '    Read: transcripts/kakuu-2026-04-15.txt (19,847字)',
+        '    発言抽出: 田中物流部長(48), 佐藤情シス(31), 山本社長(22)',
+        '    要求候補を分類中...',
+        '    抽出完了: FR48 / NFR12 / CON7 / SH4',
+        '    Write: docs/01-requirements-raw.md (3,142行)',
+        '',
+        '  Step 2: 「要求レビューモード」に切替',
+        '    Read: docs/01-requirements-raw.md',
+        '    検出: INFO 1件 / WARN 1件 / ERROR 0件',
+        '    → ブロッカー無し、次工程進行可',
+        '',
+        '✓ 完了 (2分47秒)',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'docs/01-requirements-raw.md',
+        lang: 'md',
+        body:
+`# 要求一覧（生）- 架空株式会社 在庫管理システム
+
+## 機能要求
+| ID | 要求 | 発言者 | TS | 確信度 |
+|----|------|--------|----|--------|
+| FR-001 | スマホからリアルタイム在庫照会 | 山本社長 | 00:23:11 | 高 |
+| FR-002 | バーコードによる入出庫登録 | 田中物流部長 | 00:31:48 | 高 |
+| FR-003 | 3拠点（千代田/江東/大田）の同時稼働 | 田中物流部長 | 01:02:15 | 高 |
+| FR-004 | 既存販売管理(Oracle 11g)とCSV日次連携 | 佐藤情シス | 01:18:40 | 高 |
+| FR-005 | 棚卸差異の原因追跡（履歴照会） | 田中物流部長 | 01:31:55 | 中 |
+| ...   | （以下43件略） | | | |
+
+## 非機能要求
+| NFR-001 | 在庫照会レスポンス 2秒以内 | 性能 |
+| NFR-002 | 営業時間中（8-19時）の稼働率 99.5% | 可用性 |
+| NFR-003 | 認証は多要素必須 (推定) | セキュリティ |
+
+## 制約
+- 予算: 年額1,500万円以内
+- 既存DB Oracle 11g は直接更新不可（CSV経由のみ）
+- 内製不可、ベンダー保守前提
+
+## ステークホルダー
+- 山本社長 / ROI判断・最終決裁
+- 田中物流部長 / 現場運用・最終受入
+- 佐藤情シス / 既存システム連携・運用引取`,
+      },
+    ],
+    review: {
+      skillName: '@req-reviewer',
+      prompt:
+`要求レビュアとして以下を確認:
+1. 計測不能な要求（具体化要請）
+2. 重複・矛盾
+3. ステークホルダー別の網羅
+4. 暗黙要求の取りこぼし（特にセキュリティ・法令）
+出力: [INFO]/[WARN]/[ERROR] + 該当ID + 提案`,
+      comments: [
+        { level: 'INFO', target: 'FR-007', body: '「画面はかっこよく」は計測不能。具体化要請が必要' },
+        { level: 'WARN', target: 'NFR-003', body: 'セキュリティ要件が暗黙のみ。次回ヒアリングで深堀り推奨' },
+        { level: 'OK',   target: '全件',    body: '機能要求48件すべてに発言者ソースとTSを保持' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 02 ─────────────────────────
+  {
+    num: '02',
+    title: '要求精査・優先度付け',
+    sub: 'MoSCoW分類とステークホルダー確認',
+    duration: '約8分',
+    outcome: 'Must16 / Should14 / Could10 / Wont8。確認シート自動生成、先方の同意1往復で完了',
+    flow: {
+      input:     { label: 'requirements-raw.md',   detail: '要求一覧（生）' },
+      operation: { label: '@prioritize',           detail: 'MoSCoW + 対話確認' },
+      config:    { label: 'prioritizer mode',      detail: '人間判断を内蔵' },
+      output:    { label: 'requirements-final.md', detail: '優先度付き要求' },
+    },
+    artifactsIn: [
+      { name: 'docs/01-requirements-raw.md', lang: 'md', body: '（前工程の成果物：機能要求48件・非機能要求12件・制約7件）' },
+    ],
+    configFiles: [
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/prioritizer.json',
+        lang: 'json',
+        body:
+`{
+  "name": "優先度判定モード",
+  "description": "要求一覧をMoSCoW分類し、判断に迷う項目は対話で人間に確認する",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "edit_file", "codebase_search"],
+  "autoRun": false,
+  "askBeforeEdit": true,
+  "instructions": "分類基準:\n- Must  : リリース必須。なければプロジェクト失敗\n- Should: 重要だが回避策あり\n- Could : あれば嬉しい\n- Wont  : 今回スコープ外（次フェーズ候補）\n\n迷いが生じる条件（必ずユーザーに対話で確認）:\n- 確信度「中・低」かつ Must候補\n- 予算/スケジュール制約に抵触する可能性\n- ステークホルダー間で対立する要求\n\n出力:\n- docs/02-requirements-final.md（優先度カラム付き）\n- docs/02-stakeholder-review.md（先方確認シート）"
+}`,
+      },
+      {
+        kind: 'harness',
+        path: '.cursor/settings.json（Auto-Run・書込スコープ）',
+        lang: 'json',
+        body:
+`{
+  "agent.autoRun": "ask",
+  "agent.allowedWritePaths": ["./docs"],
+  "agent.allowNetwork": false,
+  "agent.dangerousCommandsRequireConfirm": true
+}`,
+      },
+    ],
+    bestPractices: [
+      { title: '迷ったら対話確認', body: '「Cursor が勝手に決めた」を防ぐ。優先度はビジネス判断、技術判断ではない。autoRun: ask で要所止め。' },
+      { title: 'Must比率は20-40%', body: '50%超は要求肥大のサイン。「全部Must」は要求精査が機能していない証拠。' },
+      { title: 'ステークホルダー別に確認シートを分ける', body: '社長向け/現場向け/情シス向けで関心事が違う。1枚で投げると「自分の論点」だけ見て他は流される。' },
+      { title: '次フェーズ候補(Wont)も明記', body: '「捨てた」のではなく「順番に並べた」と伝える。営業上のメリットも大きい。' },
+    ],
+    officialRefs: [
+      { label: 'agent.autoRun（Cursor 設定）', body: 'never / ask / auto の3種。.cursor/settings.json で指定可能。askBeforeEdit と組合せれば、ファイル編集/コマンド実行の都度ユーザー承認を強制できる。' },
+      { label: 'agent.allowedWritePaths / .cursorignore', body: '書き込み許可ディレクトリを限定。.cursorignore に書いたパターンは Agent から不可視。AI 学習対象から外す場合は .cursorindexingignore も併用。' },
+    ],
+    execution: {
+      command: '@prioritize docs/01-requirements-raw.md',
+      lines: [
+        '> 「優先度判定モード」に切替...',
+        '  分類処理: 48件 / 12件 / 7件',
+        '  自動分類: 51件',
+        '  人間判断要請: 9件',
+        '',
+        '? autoRun=ask の承認待ち 「FR-021 IoTセンサー連携」は今回のMustですか？',
+        '  発言者の確信度: 低 / 予算逼迫: 該当',
+        '  選択肢: [Must / Should / Could / Wont / 確認延期]',
+        '> Wont (次フェーズ候補)',
+        '',
+        '... (8件の確認を経て分類完了)',
+        '',
+        'Must  16件 / Should 14件 / Could 10件 / Wont 8件',
+        '✓ 完了 (7分41秒)',
+        '  Write: docs/02-requirements-final.md',
+        '  Write: docs/02-stakeholder-review.md',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'docs/02-requirements-final.md',
+        lang: 'md',
+        body:
+`# 要求一覧（精査済）
+
+## Must (16件)
+- FR-001 スマホからリアルタイム在庫照会
+- FR-002 バーコード入出庫
+- FR-003 3拠点同時稼働
+- FR-004 Oracle CSV日次連携
+- NFR-001 照会レスポンス 2秒以内
+- NFR-002 稼働率 99.5%
+- ...
+
+## Should (14件)
+- FR-005 棚卸差異の原因追跡
+- FR-009 在庫アラート（下限割れ）
+- ...
+
+## Could (10件)
+## Wont (今回スコープ外, 次フェーズ候補)
+- FR-021 IoTセンサー連携
+- FR-034 AI需要予測`,
+      },
+      {
+        name: 'docs/02-stakeholder-review.md',
+        lang: 'md',
+        body:
+`# ステークホルダー確認シート
+
+田中物流部長 / 現場運用 / 確認依頼:
+  - FR-005 棚卸差異追跡 を Should にしました。年4回の棚卸でMust相当ですか？
+  - FR-013 写真添付 を Could にしました。証跡として必須ではないでしょうか？
+
+山本社長 / ROI判断 / 確認依頼:
+  - FR-021 IoTセンサー / FR-034 AI予測 は次フェーズへ。今期スコープ外で問題ありませんか？
+
+佐藤情シス / 連携 / 確認依頼:
+  - FR-027 SAML認証 を Should にしました。法令要件として Must では？`,
+      },
+    ],
+    review: {
+      skillName: '@review-priority',
+      prompt: 'MoSCoW分類結果を確認し、Must比率33%（16/48）が妥当か、ステークホルダー別の偏りがないか、確認シートが必要十分かをチェック。',
+      comments: [
+        { level: 'OK',   target: 'Must比率',    body: '33%。一般的な健全範囲(20-40%)' },
+        { level: 'INFO', target: '確認シート', body: '3名分、計5項目を要確認として整理。次の打合せ前に送付推奨' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 03 ─────────────────────────
+  {
+    num: '03',
+    title: '要件定義書作成',
+    sub: '社内規約に沿ったRDDを生成',
+    duration: '約12分',
+    outcome: '要件定義書（20章/68頁）+ 業務フロー図（Mermaid）+ 用語集が一括生成',
+    flow: {
+      input:     { label: 'requirements-final.md',         detail: '優先度付き要求' },
+      operation: { label: '@generate-rdd',                 detail: 'RDD生成ワークフロー' },
+      config:    { label: '@rdd-template + .cursor/rules', detail: '社内規約テンプレ' },
+      output:    { label: 'requirements-definition.md',    detail: '要件定義書 v1.0' },
+    },
+    configFiles: [
+      {
+        kind: 'knowledge',
+        path: '.cursor/rules/doc-conventions.mdc',
+        lang: 'mdc',
+        body:
+`---
+description: ドキュメント生成時に守る章立て・図表・トレーサビリティ規約
+globs: ["docs/**/*.md", "design/**/*.md"]
+alwaysApply: false
+---
+# ドキュメント規約
+
+## 章立て
+- ISO/IEC/IEEE 29148準拠
+- 図はMermaid（PlantUMLは不可）
+- 用語は本書末尾の用語集を参照（揺れを禁止）
+- 受身形を避け能動態で記述
+
+## トレーサビリティ
+- すべての要件にFR/NFR/CON IDを付与し、要求一覧と紐付け
+- 章末に「関連要求ID一覧」を必ず付ける
+
+## レビューフロー
+- ドラフト生成後、「要求レビューモード」で自動レビュー
+- WARN/ERRORが残ったままcommitしない（husky pre-commit で防止）`,
+      },
+      {
+        kind: 'skill',
+        path: '.cursor/notepads/rdd-template.md',
+        lang: 'md',
+        body:
+`---
+description: 要件定義書(RDD)の標準テンプレート。ISO/IEC/IEEE 29148準拠の章構成を強制し、関連要求IDのトレーサを自動付与する
+---
+# RDD章構成
+
+Agent Mode で \`@rdd-template <requirements-final-path>\` で参照する。
+
+1. はじめに（背景・目的・対象範囲）
+2. 用語の定義
+3. 業務概要
+4. 業務フロー（As-Is / To-Be 各Mermaid）
+5. システム化の範囲
+6. 機能要件
+7. 非機能要件
+8. 外部システム連携
+9. データ要件
+10. セキュリティ要件
+11. 運用要件
+12. 制約条件
+13. 移行要件
+14. 教育・サポート
+15. 受入基準
+16. 用語集
+（※ 第17-20章はプロジェクト個別追記）
+
+## 関連リソース
+- @rdd-skeleton
+- @glossary`,
+      },
+      {
+        kind: 'hook',
+        path: '.husky/pre-commit（WARN/ERROR残りのcommit拒否）',
+        lang: 'bash',
+        body:
+`#!/usr/bin/env bash
+# Cursor Agent が git commit を打つ前に husky 経由で実行される
+# docs/ 配下に WARN/ERROR が残っていれば commit を拒否
+set -e
+
+if grep -rE '\\[(WARN|ERROR)\\]' docs/ >/dev/null 2>&1; then
+  echo "✗ docs/ に WARN/ERROR が残っています。レビューを通してから commit してください。" >&2
+  grep -rnE '\\[(WARN|ERROR)\\]' docs/ | head -20 >&2
+  exit 1
+fi
+
+# lint-staged で typecheck/lint も自動実行
+npx lint-staged`,
+      },
+    ],
+    bestPractices: [
+      { title: '章構成は規約に強制させる', body: '「次の案件でも同じ品質で」を実現するには、人の記憶ではなくNotepadに記憶させる。~/.cursor/notepads/ で雛形を一元化。' },
+      { title: 'トレーサIDで「なぜこの仕様か」を5秒で遡る', body: '半年後の改修時、要求まで戻れる構造が事故を防ぐ。' },
+      { title: '生成→自動レビュー→コミットを husky で連鎖', body: 'pre-commit hook で WARN/ERROR 残りの commit を物理的に止める。レビューを忘れる人間の脆弱性を補う。' },
+      { title: 'Mermaidに統一', body: '画像系はバージョン管理で差分が見えない。テキスト系図に絞ると差分レビュー可能。' },
+    ],
+    officialRefs: [
+      { label: 'Notepads（Cursor 公式機能）', body: '.cursor/notepads/*.md または ~/.cursor/notepads/*.md にMarkdown + frontmatter (description) で配置すると Agent Mode から @notepad-name で参照可能。プロジェクトとユーザーグローバルで使い分け。' },
+      { label: 'husky + lint-staged（OSS デファクト）', body: 'Cursor 自体には独自フック機能は無いため、git hooks (husky) と lint-staged で同等を実装。.husky/pre-commit から typecheck / lint / secret-check を直列実行する。' },
+      { label: '.cursor/environment.json（Background Agent）', body: 'Cursor Background Agents 専用の環境定義ファイル。install / terminals / snapshot を記述し、クラウド側で再現可能な実行環境を整える。' },
+    ],
+    execution: {
+      command: '@generate-rdd docs/02-requirements-final.md',
+      lines: [
+        '> @rdd-template Notepad を適用',
+        '  .cursor/rules/doc-conventions.mdc を読込: 章構成 / トレーサ / 図表ルール',
+        '  業務フロー(As-Is)を Mermaid で生成中...',
+        '  業務フロー(To-Be)を Mermaid で生成中...',
+        '  章 1-20 を生成中... (進捗 20/20)',
+        '',
+        '生成完了:',
+        '  本文      8,420行',
+        '  Mermaid図   6点',
+        '  用語集     38語',
+        '',
+        '> 「要求レビューモード」に切替...',
+        '  WARN 0件 / ERROR 0件',
+        '✓ 完了 (11分58秒)',
+        '  Write: docs/03-requirements-definition.md',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'docs/03-requirements-definition.md',
+        lang: 'md',
+        body:
+`# 在庫管理システム 要件定義書 v1.0
+
+## 1. はじめに
+### 1.1 背景
+架空株式会社は3拠点で稼働するExcel在庫管理に依存しており、最新版の特定に毎日2時間を要している。営業現場では在庫照会に半日以上を要する場合があり、機会損失が発生している。
+
+### 1.2 目的
+拠点横断のリアルタイム在庫管理を実現し、現場運用効率を改善する。
+
+## 4. 業務フロー
+### 4.1 As-Is
+\`\`\`mermaid
+flowchart LR
+  A[受注] --> B[Excel台帳に記入]
+  B --> C{台帳3種を確認}
+  C -->|差異あり| D[電話で在庫照会]
+  C -->|差異なし| E[出荷指示]
+  D --> E
+\`\`\`
+### 4.2 To-Be
+\`\`\`mermaid
+flowchart LR
+  A[受注] --> B[在庫DB照会]
+  B --> C[出荷指示]
+  C --> D[バーコード読取]
+  D --> E[在庫DB更新]
+\`\`\`
+
+## 6. 機能要件
+### 6.1 在庫照会 (FR-001)
+- スマホ/PCブラウザから在庫数を照会できること
+- 拠点別/品目別/ロット別で表示できること
+- 関連要求: FR-001, FR-003, NFR-001
+
+（以下20章まで継続）`,
+      },
+    ],
+    review: {
+      skillName: '@review-rdd',
+      prompt: 'RDDの章立てが .cursor/rules/doc-conventions.mdc 準拠か、要求IDのトレーサビリティが全項目で取れているか、図表ルール（Mermaid限定）が守られているかチェック。',
+      comments: [
+        { level: 'OK',   target: '章構成',           body: '20章すべてテンプレ準拠' },
+        { level: 'OK',   target: 'トレーサビリティ', body: '機能要件章すべてに関連要求ID記載' },
+        { level: 'INFO', target: '4.1 As-Is図',    body: '業務フローを実測値（毎日2時間）と接続。読み手にインパクト' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 04 ─────────────────────────
+  {
+    num: '04',
+    title: '仕様定義',
+    sub: '機能仕様書とユーザーストーリーを生成',
+    duration: '約18分',
+    outcome: 'ユーザーストーリー36本（US-001〜036）+ 受入基準（Gherkin）+ 機能仕様書',
+    flow: {
+      input:     { label: 'requirements-definition.md', detail: '要件定義書' },
+      operation: { label: '@spec-out',                  detail: '仕様生成ワークフロー' },
+      config:    { label: 'spec-writer mode',           detail: 'Gherkin準拠' },
+      output:    { label: 'specification/',             detail: '仕様書一式' },
+    },
+    configFiles: [
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/spec-writer.json',
+        lang: 'json',
+        body:
+`{
+  "name": "仕様起こしモード",
+  "description": "要件定義書から機能仕様書とユーザーストーリーを生成する",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "edit_file", "codebase_search", "list_dir"],
+  "autoRun": false,
+  "instructions": "出力ルール:\n- ユーザーストーリーは「As a ... / I want ... / So that ...」形式\n- 受入基準は Gherkin (Given/When/Then) で記述\n- 1ストーリー = 1ファイル (specification/stories/US-XXX.md)\n- 関連要求IDを冒頭にメタデータとして付与\n- 画面仕様は ASCII art ワイヤーで補強\n\nINVEST原則:\n- Independent: ストーリー間で順序依存しない\n- Negotiable: 詳細は会話で詰める\n- Valuable: ステークホルダーに価値が届く\n- Estimable: 見積もり可能 (13pt以上は分割サイン)\n- Small: 1スプリントで完了\n- Testable: 受入基準で検証可能"
+}`,
+      },
+      {
+        kind: 'knowledge',
+        path: 'templates/user-story.md',
+        lang: 'md',
+        body:
+`---
+id: US-XXX
+related: FR-XXX, NFR-XXX
+priority: Must|Should|Could
+estimate: <1-13>pt
+---
+# US-XXX タイトル
+
+As a <ロール>
+I want <欲しい振る舞い>
+So that <得られる価値>
+
+## 受入基準
+\`\`\`gherkin
+Feature: ...
+  Scenario: 正常系
+    Given ...
+    When ...
+    Then ...
+\`\`\`
+
+## ワイヤーフレーム
+\`\`\`
+（ASCII artで補強）
+\`\`\``,
+      },
+    ],
+    bestPractices: [
+      { title: '1ストーリー=1ファイル', body: '差分レビューしやすく、PR単位とも一致する。長大な仕様書1本より管理コストが下がる。' },
+      { title: 'Gherkinはそのままit()に変換', body: '仕様↔テストのリンクが切れない。後工程のQAエンジニアモードが同じファイルを読めば自動でテストになる。' },
+      { title: '13pt以上は分割サイン', body: '見積もりが大きすぎる=要件が混ざっている。割れない場合はスパイク(調査タスク)に切り出す。' },
+      { title: 'ASCIIワイヤーで意図を固定', body: '画像はバージョン管理で差分が読めない。荒くてもテキストの方が後で活きる。' },
+    ],
+    officialRefs: [
+      { label: '.cursor/modes/*.json（Custom Mode 仕様）', body: 'name / description / instructions が必須、model / tools / mcpServers / autoRun / askBeforeEdit が任意。Settings > Modes から有効化したものだけが Agent Mode のメニューに出る。' },
+      { label: 'Cursor 公式: Background Agents', body: 'クラウド側で並列実行できる Agent。長時間タスクや並列レビュー向け。.cursor/environment.json で実行環境を定義し、Web UI / CLI から起動可能。' },
+    ],
+    execution: {
+      command: '@spec-out docs/03-requirements-definition.md',
+      lines: [
+        '> 「仕様起こしモード」に切替...',
+        '  機能要件 24項 → ユーザーストーリー候補に変換中',
+        '  US-001 ~ US-036 を生成 (進捗 36/36)',
+        '  受入基準 Gherkin を 124本 生成',
+        '  画面仕様 ワイヤー 18面 を生成',
+        '',
+        '✓ 完了 (17分22秒)',
+        '  Write: specification/functional-spec.md',
+        '  Write: specification/stories/US-001.md ~ US-036.md',
+        '  Write: specification/wireframes/*.txt',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'specification/stories/US-001.md',
+        lang: 'md',
+        body:
+`---
+id: US-001
+related: FR-001, FR-003, NFR-001
+priority: Must
+estimate: 3pt
+---
+# US-001 リアルタイム在庫照会
+
+As a 営業担当
+I want スマホから品目コードで在庫を照会し
+So that 客先で即答できる
+
+## 受入基準
+\`\`\`gherkin
+Feature: 在庫照会
+  Scenario: 品目コードでの照会
+    Given 営業担当者がログイン済みである
+    When 品目コード "A-001" を入力する
+    Then 千代田/江東/大田の在庫数が2秒以内に表示される
+
+  Scenario: 在庫切れ品目の表示
+    Given 在庫が0の品目 "B-099" がある
+    When 品目コード "B-099" を入力する
+    Then 「在庫切れ」表示と最終出庫日が表示される
+\`\`\`
+
+## ワイヤーフレーム
+\`\`\`
++----------------------------+
+| [≡] 在庫照会        [USER] |
++----------------------------+
+| 品目コード: [____ ]    [Q] |
++----------------------------+
+| A-001 電子コネクタ TypeA   |
+|   千代田 120 / 江東   85   |
+|   大田    42 / 計    247   |
++----------------------------+
+\`\`\``,
+      },
+    ],
+    review: {
+      skillName: '@review-spec',
+      prompt: 'ユーザーストーリーが INVEST 原則を満たすか、Gherkinが具体的か、関連要求IDの取りこぼしがないかチェック。',
+      comments: [
+        { level: 'OK',   target: 'INVEST', body: '36本すべて Independent / Testable を満たす' },
+        { level: 'INFO', target: 'US-014', body: '見積もり13ptが過大。分割を検討' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 05 ─────────────────────────
+  {
+    num: '05',
+    title: '基本設計',
+    sub: 'アーキ・DB・APIとADRを同時に生成',
+    duration: '約25分',
+    outcome: 'C4図(L1-L3) / ER図 / OpenAPI仕様 / ADR-0001〜0008',
+    flow: {
+      input:     { label: 'specification/',          detail: '仕様書一式' },
+      operation: { label: '@design-architecture',    detail: '設計ワークフロー' },
+      config:    { label: 'architect mode + ADRテンプレ', detail: '意思決定の記録' },
+      output:    { label: 'design/basic/',           detail: '基本設計書一式' },
+    },
+    configFiles: [
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/architect.json',
+        lang: 'json',
+        body:
+`{
+  "name": "アーキ設計モード",
+  "description": "仕様書からシステムアーキテクチャ・DB・API設計を生成。意思決定はADRに記録",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "edit_file", "codebase_search", "web_search"],
+  "mcpServers": ["github"],
+  "autoRun": false,
+  "instructions": "意思決定が必要な場面で必ずADR(Architecture Decision Record)を生成。\n\n## 設計の前提\n- 技術スタック既定: Next.js 15 / TypeScript / PostgreSQL / Vercel\n- 認証: Auth.js + SAML2.0 (社内IdP連携)\n- 既存Oracle 11gとはCSV(SFTP) 日次バッチ\n\n## 出力\n- C4 Level 1 (System Context)\n- C4 Level 2 (Container)\n- C4 Level 3 (Component) ※主要コンテナのみ\n- ER図 (Mermaid)\n- OpenAPI 3.1 仕様\n- ADR-NNNN.md (意思決定ごと)"
+}`,
+      },
+      {
+        kind: 'knowledge',
+        path: 'templates/adr.md',
+        lang: 'md',
+        body:
+`# ADR-NNNN: <決定タイトル>
+
+## ステータス
+提案 / 採用 / 廃止
+
+## 文脈
+何が課題で、なぜ今決める必要があるのか
+
+## 決定
+何を選んだか
+
+## 結果
+良い影響 / 悪い影響 / 受け入れたトレードオフ
+
+## 代替案
+検討したが採用しなかった選択肢と却下理由`,
+      },
+      {
+        kind: 'mcp',
+        path: '.cursor/mcp.json（プロジェクト範囲のMCP定義）',
+        lang: 'json',
+        body:
+`{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_TOKEN}"
+      }
+    }
+  }
+}`,
+      },
+    ],
+    bestPractices: [
+      { title: '意思決定の瞬間にADRを書く', body: '半年後に「なぜこの選択にした？」を再現できないと、改修時に必ず後悔する。' },
+      { title: '代替案と却下理由まで書く', body: 'ADRの本体は「却下した道」。そこを残さないと意思決定の再現性が0になる。' },
+      { title: 'C4のレベル粒度を統一', body: 'L1〜L3で抽象度がブレると読み手が迷う。L3はサービス1〜2個に絞る。' },
+      { title: 'OpenAPIをmainブランチに置く', body: 'フロントとサーバーが同じファイルを参照することで、契約破壊を即検知。' },
+    ],
+    officialRefs: [
+      { label: 'GitHub MCP（GitHub公式提供）', body: 'PR/Issue/コメントを Cursor Agent から直接操作。設計決定をPRとして残せる。' },
+      { label: '.cursor/mcp.json（公式仕様）', body: 'mcpServers キー配下に command / args / env を記述。プロジェクト固有は .cursor/mcp.json、ユーザー共通は ~/.cursor/mcp.json。Cursor 起動時に自動マウントされ、Agent Mode から透過的に呼べる。' },
+      { label: 'Model Context Protocol（公式仕様）', body: 'stdio / HTTP / SSE のトランスポート、認可フロー、サーバー実装ガイドは modelcontextprotocol.io を参照。' },
+    ],
+    execution: {
+      command: '@design-architecture specification/',
+      lines: [
+        '> 「アーキ設計モード」に切替...',
+        '  C4 L1 System Context を生成',
+        '  C4 L2 Container を生成 (Web/API/DB/Batch/IdP)',
+        '  C4 L3 Component を主要3コンテナで生成',
+        '  ER図: 12テーブル, 主要関連18本',
+        '  OpenAPI: 24エンドポイント',
+        '',
+        '  意思決定が発生 → ADR生成:',
+        '    ADR-0001 フロントは Next.js 採用',
+        '    ADR-0002 DBは PostgreSQL 採用',
+        '    ADR-0003 認証は Auth.js + SAML2.0',
+        '    ADR-0004 バーコード読取はWeb Bluetooth不採用、PWAカメラ採用',
+        '    ADR-0005 拠点ルーティングはアプリ層で処理',
+        '    ADR-0006 監査ログは別DBに分離',
+        '    ADR-0007 デプロイは Vercel + Supabase',
+        '    ADR-0008 バッチは Vercel Cron',
+        '',
+        '✓ 完了 (24分10秒)',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'design/basic/c4-l1.md',
+        lang: 'md',
+        body:
+`# C4 Level 1: System Context
+\`\`\`mermaid
+flowchart TB
+  user1[営業担当 スマホ] --> sys[在庫管理システム]
+  user2[現場作業員 タブレット] --> sys
+  user3[管理者 PC] --> sys
+  sys --> idp[社内IdP SAML2.0]
+  sys --> oracle[(Oracle 11g 既存販売管理)]
+  sys --> mail[メール配信]
+\`\`\``,
+      },
+      {
+        name: 'design/basic/adr/ADR-0002.md',
+        lang: 'md',
+        body:
+`# ADR-0002: DBは PostgreSQL を採用
+
+## ステータス
+採用
+
+## 文脈
+既存販売管理システムが Oracle 11g。直接更新不可の制約あり (CON-002)。本システムDBの選択肢として Oracle / PostgreSQL / MySQL を比較。
+
+## 決定
+PostgreSQL を採用する。
+
+## 結果
+良い影響:
+- ライセンス費用ゼロ
+- Vercel + Supabase で運用負担を最小化
+- JSONB対応でロット属性の柔軟な拡張が可能
+
+悪い影響:
+- 既存DBA(Oracle経験)の学習コスト
+
+受け入れたトレードオフ:
+- バッチ連携は CSV (SFTP) で疎結合に保ち、両DBの差異を吸収
+
+## 代替案
+- Oracle 21c: ライセンス費 年700万 → 予算外で却下
+- MySQL: JSONB対応に難 → 却下`,
+      },
+    ],
+    review: {
+      skillName: '@architecture-review',
+      prompt: 'C4図のレベル整合性、ADRの根拠強度、OpenAPIのRESTfulness、性能要件(NFR-001 2秒)が達成可能かをチェック。',
+      comments: [
+        { level: 'OK',   target: 'ADR-0002', body: 'トレードオフが明示。再現性ある意思決定' },
+        { level: 'WARN', target: 'NFR-001 2秒', body: '在庫照会は3拠点同時参照。インデックス設計と接続プールサイズを詳細設計で要確認' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 06 ─────────────────────────
+  {
+    num: '06',
+    title: '詳細設計',
+    sub: 'クラス・シーケンス・画面遷移・検証定義',
+    duration: '約32分',
+    outcome: 'クラス図18点 / シーケンス図24本 / 画面遷移図6本 / 入力検証マトリクス',
+    flow: {
+      input:     { label: 'design/basic/',       detail: '基本設計書一式' },
+      operation: { label: '@detailed-design',    detail: '詳細設計ワークフロー' },
+      config:    { label: 'detail-designer mode', detail: 'シーケンス自動生成' },
+      output:    { label: 'design/detail/',      detail: '詳細設計書一式' },
+    },
+    configFiles: [
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/detail-designer.json',
+        lang: 'json',
+        body:
+`{
+  "name": "詳細設計モード",
+  "description": "基本設計とユーザーストーリーから詳細設計書を生成",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "edit_file", "codebase_search"],
+  "autoRun": false,
+  "instructions": "出力:\n- クラス図 (Mermaid classDiagram, レイヤー別)\n- シーケンス図 (1ストーリーにつき正常系/異常系2本以上)\n- 画面遷移図 (stateDiagram)\n- 入力検証マトリクス (項目 / 必須 / 型 / 範囲 / メッセージ)\n- エラーコード一覧 (機能ドメインプレフィクス: E_AUTH_xxx, E_STOCK_xxx)"
+}`,
+      },
+      {
+        kind: 'knowledge',
+        path: 'templates/error-code.md',
+        lang: 'md',
+        body:
+`# エラーコード命名規約
+
+形式: E_<ドメイン>_<連番3桁>
+例: E_AUTH_001 / E_STOCK_011 / E_BARCODE_021
+
+## ドメイン
+- AUTH    認証・認可
+- STOCK   在庫
+- BARCODE バーコード読取
+- AUDIT   監査ログ
+- BATCH   バッチ連携
+- SYS     システム共通
+
+## ルール
+- HTTPステータスとは1対1にしない（業務エラーは200で返す場合あり）
+- 連番は10ずつ空けて始める（追加余地）
+- メッセージはユーザー向けとログ向けを分ける`,
+      },
+    ],
+    bestPractices: [
+      { title: '異常系シーケンスを正常系の0.5倍以上', body: '異常系こそ事故の温床。正常系1本に対し最低0.5本の異常系を強制すると見落としが減る。' },
+      { title: 'エラーコードは機能ドメインで分割', body: 'E0001のような連番だけだと「どこで起きた？」が分からない。E_STOCK_011のようにドメインを前置すると検索性が桁違い。' },
+      { title: '入力検証マトリクスをコードと同じリポジトリに', body: '別管理にすると必ず乖離する。コード生成のソースにできる粒度で書く。' },
+      { title: '画面遷移図は閉路チェック', body: '「行ったきり戻れない画面」は detail_designer が検知。ユーザーがハマる経路を設計時に潰す。' },
+    ],
+    officialRefs: [
+      { label: 'Cursor 公式: Custom Mode 権限', body: 'Custom Mode の autoRun: never と allowedWritePaths を限定すれば、設計フェーズで誤って外部に書き出す事故を防げる。読み取り専用にしたい場合は tools から edit_file を除外する。' },
+    ],
+    execution: {
+      command: '@detailed-design design/basic/ specification/stories/',
+      lines: [
+        '> 「詳細設計モード」に切替...',
+        '  Read: 基本設計書 / ユーザーストーリー36本',
+        '  クラス図 (Domain/Application/Infrastructure 18点)',
+        '  シーケンス図 (US-001 ~ US-036 / 計24本)',
+        '  画面遷移図 (主要6画面)',
+        '  入力検証マトリクス (212項目)',
+        '  エラーコード一覧 (E_AUTH_001 ~ E_BATCH_007)',
+        '',
+        '✓ 完了 (31分44秒)',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'design/detail/sequence/US-002-barcode-scan.md',
+        lang: 'md',
+        body:
+`# US-002 バーコード入出庫 - シーケンス（正常系）
+
+\`\`\`mermaid
+sequenceDiagram
+  participant U as 現場作業員
+  participant W as PWA
+  participant API as API Server
+  participant DB as PostgreSQL
+  participant L as 監査ログDB
+
+  U->>W: バーコードをカメラでスキャン
+  W->>W: コード形式バリデーション
+  W->>API: POST /stock/transactions
+  API->>API: JWT検証 + 拠点権限確認
+  API->>DB: BEGIN
+  API->>DB: 在庫数 -1 (品目+拠点)
+  API->>L: 監査ログ書込
+  API->>DB: COMMIT
+  API-->>W: 200 + 残数
+  W-->>U: 「出庫完了 残42」表示
+\`\`\``,
+      },
+      {
+        name: 'design/detail/validation-matrix.md',
+        lang: 'md',
+        body:
+`# 入力検証マトリクス（抜粋）
+
+| 画面 | 項目 | 必須 | 型 | 範囲 | エラーコード | メッセージ |
+|------|------|------|----|----|--------------|------------|
+| 在庫照会 | 品目コード | ○ | string | 5-12文字, 半角英数+'-' | E_STOCK_011 | 品目コードを正しく入力してください |
+| 入出庫 | バーコード | ○ | string | EAN-13形式 | E_BARCODE_021 | 読取に失敗しました。再スキャンしてください |
+| 入出庫 | 数量 | ○ | int | 1 - 99999 | E_STOCK_022 | 数量は1-99999で入力してください |`,
+      },
+    ],
+    review: {
+      skillName: '@detailed-design-review',
+      prompt: '異常系シーケンスの網羅性、エラーコード重複、画面遷移の閉路をチェック。',
+      comments: [
+        { level: 'INFO', target: 'US-008',   body: '異常系シーケンスが正常系1本のみ。タイムアウト経路を追加推奨' },
+        { level: 'OK',   target: 'エラーコード', body: '全67件、ドメインプレフィクス重複なし' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 07 ─────────────────────────
+  {
+    num: '07',
+    title: '実装',
+    sub: 'husky + lint-staged でガードレールを敷きつつストーリー単位で実装',
+    duration: '約4日（並走）',
+    outcome: 'PR #41-#76 / 36ストーリー / 自動修正適用済',
+    livePreview: {
+      title: '完成版を実際に操作する',
+      description: '本工程で実装したアプリの動作デモを別タブで開けます。AI駆動開発12テーマを通して、Cursor がどのような成果物を作り出すかを画面ごと確認できます。',
+      image: 'assets/app-preview.png',
+      imageAlt: '完成版アプリのトップ画面',
+      url: 'https://ai-dev-demo.ezoai.jp',
+      cta: 'アプリを新規タブで開く',
+    },
+    flow: {
+      input:     { label: 'design/detail/',         detail: '詳細設計書' },
+      operation: { label: '@implement-feature',     detail: 'ストーリー単位で実装' },
+      config:    { label: 'settings.json + husky', detail: 'lint-staged/pre-commit/pre-push' },
+      output:    { label: 'PR diff',                detail: 'GitHub Pull Request' },
+    },
+    configFiles: [
+      {
+        kind: 'knowledge',
+        path: '.cursor/rules/coding-standards.mdc',
+        lang: 'mdc',
+        body:
+`---
+description: 実装時の言語・スタック・不変性・エラー・テスト規約。TypeScript ファイルを開いた瞬間に自動適用
+globs: ["src/**/*.ts", "src/**/*.tsx"]
+alwaysApply: true
+---
+# コーディング規約
+
+## 言語・スタック
+- TypeScript strict / Next.js 15 App Router
+- Server Components 優先 / 'use client' は最小範囲
+- データアクセスは Repository パターン
+
+## 不変性
+- 配列は spread / map / filter で更新
+- オブジェクトは {...obj, key: value}
+- mutate するメソッド (push/sort/reverse) は禁止
+
+## エラー
+- 例外は境界層で握る (API Route / Server Action)
+- 内部関数は throw を維持
+
+## テスト
+- 1ファイル = 1スイート
+- 単体テストは Vitest
+- E2Eは Playwright`,
+      },
+      {
+        kind: 'harness',
+        path: '.cursor/settings.json（プロジェクト設定）',
+        lang: 'json',
+        body:
+`{
+  "agent.defaultModel": "claude-sonnet-4.5",
+  "agent.reasoningEffort": "high",
+  "agent.autoRun": "ask",
+  "agent.allowedWritePaths": ["./src", "./specification", "./design"],
+  "agent.allowNetwork": false,
+  "agent.shellEnvFilter": {
+    "exclude": ["*KEY*", "*TOKEN*", "*SECRET*"]
+  },
+  "agent.terminalEnabled": true,
+  "agent.parallelEnabled": true,
+  "modes.profiles": {
+    "strict": {
+      "agent.autoRun": "never",
+      "agent.allowedWritePaths": []
+    }
+  }
+}`,
+      },
+      {
+        kind: 'hook',
+        path: 'package.json（lint-staged + husky 統合）',
+        lang: 'json',
+        body:
+`{
+  "scripts": {
+    "prepare": "husky",
+    "typecheck": "tsc --noEmit",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "node .husky/scripts/check-secrets.mjs",
+      "npm run typecheck",
+      "npm run lint:fix"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "npm test && node .husky/scripts/notify.mjs done"
+    }
+  }
+}`,
+      },
+      {
+        kind: 'hook',
+        path: '.husky/scripts/block-dangerous.mjs',
+        lang: 'js',
+        body:
+`#!/usr/bin/env node
+// Cursor の自動コマンド実行ポリシーに加え、独自にチェックする保険レイヤー
+// .cursor/settings.json の "agent.beforeRunCommand" に紐づけて起動
+import { argv, exit } from 'node:process'
+
+const cmd = argv.slice(2).join(' ')
+const danger = /git push.*--force|git reset --hard|^sudo |rm -rf \//
+
+if (danger.test(cmd)) {
+  console.error(\`✗ Blocked dangerous command: \${cmd}\`)
+  exit(1) // 非0で Agent が即座に停止
+}
+exit(0)`,
+      },
+      {
+        kind: 'hook',
+        path: '.husky/scripts/check-secrets.mjs',
+        lang: 'js',
+        body:
+`#!/usr/bin/env node
+// lint-staged から呼ばれ、ステージ済みファイルに機密値が含まれないかチェック
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+
+const PATTERNS = [
+  /AKIA[0-9A-Z]{16}/,                       // AWS Access Key
+  /sk_live_[0-9a-zA-Z]{24}/,                // Stripe live key
+  /-----BEGIN [A-Z ]+PRIVATE KEY-----/,     // PEM
+]
+
+const files = execSync('git diff --cached --name-only --diff-filter=ACMR')
+  .toString().trim().split('\\n').filter(Boolean)
+
+for (const f of files) {
+  const content = readFileSync(f, 'utf8')
+  for (const re of PATTERNS) {
+    if (re.test(content)) {
+      console.error(\`✗ Possible secret detected in \${f}\`)
+      process.exit(1)
+    }
+  }
+}`,
+      },
+      {
+        kind: 'skill',
+        path: '~/.cursor/notepads/simplify.md',
+        lang: 'md',
+        body:
+`---
+description: 変更コードを再利用性・命名・効率の観点でレビューし、必要なら修正する
+---
+# simplify
+
+Agent Mode で \`@simplify\` または \`@simplify --review-only\` で呼び出す。
+
+## 観点
+1. 既存ユーティリティで置き換えできないか
+2. 命名は verb-noun / isXxx / hasXxx になっているか
+3. 早すぎる抽象化(YAGNI違反)になっていないか
+4. 重複コード(DRY違反)がないか
+5. mutateしている箇所(immutable違反)がないか
+
+## 動作
+- \`@simplify\` でレビュー → 修正提案 → 同意ある場合のみ反映
+- \`@simplify --review-only\` でレビューのみ`,
+      },
+      {
+        kind: 'command',
+        path: '.cursor/notepads/implement-feature.md',
+        lang: 'md',
+        body:
+`---
+description: ユーザーストーリーIDを引数に、ブランチ作成→実装→テスト→PR作成まで一気通貫
+---
+# 実装パイプライン
+
+Agent Mode で \`@implement-feature US-XXX\` で起動。
+
+## 手順
+1. specification/stories/US-XXX.md と design/detail/sequence/US-XXX-*.md を読込
+2. \`git checkout -b feat/US-XXX-...\`
+3. 詳細設計に従い実装
+   - lint-staged が typecheck/lint:fix を自動実行
+   - pre-push hook で全テスト実行
+4. \`@simplify --review-only\` を実行し、対応必要なら修正
+5. \`gh pr create\` でPR作成
+
+## 守るべきこと
+- src/ 以外には書かない（.cursor/settings.json の allowedWritePaths で制限）
+- mutateしない（.cursor/rules/coding-standards.mdc）`,
+      },
+    ],
+    bestPractices: [
+      { title: 'ガードレールは husky + lint-staged で敷く', body: 'pre-commit で typecheck/lint を自動実行、機密値スキャンも同時に。「忘れる人間」を補強。' },
+      { title: '危険コマンドは allowedWritePaths + husky で二段防御', body: 'agent.allowedWritePaths だけでは完全とは限らない。.husky/scripts/block-dangerous.mjs で実行直前に物理的に阻止する。' },
+      { title: '$WORKSPACE_FOLDER を使う', body: '相対パスはサブシェルで壊れる。Cursor が起動時に注入する環境変数を使うと堅牢。' },
+      { title: 'pre-push hook でテストを最終ガード', body: 'PR 直前の git push 時にテストを実行。落ちていれば push 自体を拒否し、Agent が「完了」と返す前に補足する。' },
+      { title: 'notify.mjs で外部通知を一元化', body: '.husky/scripts/notify.mjs に集約。Slack / desktop / CI 連携を引数から分岐。' },
+      { title: '1ストーリー=1ブランチ=1PR', body: 'PRサイズが小さいほどレビュー所要時間は二乗で短くなる。' },
+    ],
+    officialRefs: [
+      { label: 'husky + lint-staged（git hooks 経由のガードレール）', body: 'Cursor 単体には hook 機能が無いため、git hooks で typecheck/lint/secret-check を強制。pre-commit で lint-staged、pre-push で全テストの2段構え。' },
+      { label: 'agent.allowedWritePaths（Cursor 設定）', body: 'src/ や docs/ など書き込み許可ディレクトリを限定。.cursorignore と組み合わせれば、機密ファイル (.env等) はそもそも Agent から不可視にできる。' },
+      { label: 'agent.allowNetwork（Cursor 設定）', body: 'false にすると Agent が外部 HTTP を発行できない。社外秘データを扱うプロジェクトの初手として推奨。' },
+      { label: 'Background Agent + Slack Webhook', body: 'Cursor Background Agent 内から Slack Incoming Webhook を叩けば、完了通知やレビュー要請を自動投下できる。.husky/scripts/notify.mjs に集約。' },
+      { label: 'modes.profiles（Cursor 設定）', body: '.cursor/settings.json の modes.profiles で strict / dev / prod など複数プロファイルを定義。レビュー時のみ allowedWritePaths: [] にする運用が定番。' },
+    ],
+    execution: {
+      command: '@implement-feature US-001',
+      lines: [
+        '> US-001 リアルタイム在庫照会 を実装します',
+        '  Read: design/detail/ + specification/stories/US-001.md',
+        '',
+        '  Bash: git checkout -b feat/US-001-inventory',
+        '',
+        '  Write: src/app/(stock)/inventory/page.tsx',
+        '  → lint-staged: check-secrets.mjs ... ✓',
+        '  → lint-staged: npm run typecheck ... ✓',
+        '  → lint-staged: npm run lint:fix ... ✓',
+        '',
+        '  Write: src/server/repositories/stock.repository.ts',
+        '  → lint-staged: npm run typecheck ... ✗',
+        '    Error: Property "warehouse_id" does not exist on type "Stock"',
+        '  → 型定義に warehouse_id を追加',
+        '  → lint-staged: npm run typecheck ... ✓',
+        '',
+        '  Write: src/server/repositories/stock.repository.test.ts',
+        '',
+        '  pre-push hook: npm test ... ✓ (8 passed)',
+        '',
+        '  @simplify --review-only',
+        '    INFO: 1件 (mutateなし、命名OK、要対応なし)',
+        '',
+        '  Bash: gh pr create --title "feat(US-001): リアルタイム在庫照会"',
+        '    notify.mjs (Slack Webhook) が完了通知',
+        '',
+        '✓ 完了 PR #41 作成',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'src/app/(stock)/inventory/page.tsx',
+        lang: 'tsx',
+        body:
+`import { stockRepository } from '@/server/repositories/stock.repository'
+import { InventorySearch } from '@/components/inventory/InventorySearch'
+
+export default async function InventoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>
+}) {
+  const { code } = await searchParams
+  const stocks = code ? await stockRepository.findByItemCode(code) : []
+
+  return (
+    <main className="p-4">
+      <h1 className="text-xl font-bold mb-4">在庫照会</h1>
+      <InventorySearch defaultCode={code} />
+      {code && <InventoryResult stocks={stocks} />}
+    </main>
+  )
+}
+
+function InventoryResult({ stocks }: { stocks: Stock[] }) {
+  if (stocks.length === 0) {
+    return <p className="text-stone-500">該当する品目がありません</p>
+  }
+  const total = stocks.reduce((sum, s) => sum + s.quantity, 0)
+  return (
+    <ul className="mt-4 divide-y">
+      {stocks.map((s) => (
+        <li key={\`\${s.itemCode}-\${s.warehouseId}\`} className="py-2">
+          <span className="font-medium">{s.warehouseName}</span>
+          <span className="ml-2 tabular-nums">{s.quantity}</span>
+        </li>
+      ))}
+      <li className="py-2 font-bold">計 {total}</li>
+    </ul>
+  )
+}`,
+      },
+    ],
+    review: {
+      skillName: '@simplify',
+      prompt: '生成コードに対して再利用性・命名・効率の観点でレビュー。冗長/重複/早すぎる抽象化を指摘し、必要なら修正案を提示。',
+      comments: [
+        { level: 'INFO', target: 'InventoryResult', body: '同コンポーネント内に表示ロジックが散在。Stock合計の算出を Repository層に寄せる選択肢も検討（YAGNI観点で現状維持も可）' },
+        { level: 'OK',   target: '不変性', body: 'reduce / map のみで mutate なし' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 08 ─────────────────────────
+  {
+    num: '08',
+    title: 'テスト & レビュー',
+    sub: '3エージェント並列で security / review / qa を一括実行',
+    duration: '約45分',
+    outcome: 'カバレッジ87% / E2E 24本 / 自動修正18件 / セキュリティ問題ゼロ',
+    flow: {
+      input:     { label: 'PR #41-#76',                 detail: '実装PR一式' },
+      operation: { label: '@security-review + @full-review', detail: 'レビュー2種' },
+      config:    { label: 'code-reviewer + qa-engineer', detail: 'Custom Mode 並列' },
+      output:    { label: 'review-report.md',           detail: 'レビュー総括' },
+    },
+    configFiles: [
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/code-reviewer.json',
+        lang: 'json',
+        body:
+`{
+  "name": "コードレビューモード",
+  "description": "PRのdiffを精査。Project Rules・命名・不変性・例外境界・性能を確認",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "codebase_search", "grep"],
+  "mcpServers": ["github"],
+  "autoRun": true,
+  "instructions": "レビュー観点:\n1. Project Rules (.cursor/rules/*.mdc) 準拠\n2. 不変性（mutate禁止）\n3. 例外の境界層集約\n4. N+1クエリ / 不要なPromise.all 欠落\n5. 命名 (verb-noun, isXxx, hasXxx)\n6. テスト網羅 (正常/異常系)\n\n出力: PRコメント形式 (file:line + 提案コード)"
+}`,
+      },
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/qa-engineer.json',
+        lang: 'json',
+        body:
+`{
+  "name": "QAエンジニアモード",
+  "description": "ユーザーストーリーから単体/E2Eテストを生成し、Playwright MCPで実行",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "edit_file", "run_terminal_cmd"],
+  "mcpServers": ["playwright"],
+  "autoRun": true,
+  "instructions": "- 単体: Vitest, AAA(Arrange/Act/Assert)\n- E2E: Playwright, ストーリー単位\n- 受入基準のGherkin Scenarioをそのまま it() に変換"
+}`,
+      },
+      {
+        kind: 'skill',
+        path: '~/.cursor/notepads/security-review.md',
+        lang: 'md',
+        body:
+`---
+description: 変更diffをOWASP Top10観点で精査し、検出時はファイル/行/CWE/重大度/修正案を返す
+---
+# Security Review
+
+Agent Mode で \`@security-review\` または \`@security-review PR=41\` で起動。
+
+## 観点（OWASP Top 10:2021）
+- A01 Broken Access Control
+- A02 Cryptographic Failures
+- A03 Injection
+- A04 Insecure Design
+- A05 Security Misconfiguration
+- A06 Vulnerable & Outdated Components
+- A07 Identification & Authentication
+- A08 Software and Data Integrity
+- A09 Security Logging & Monitoring
+- A10 SSRF
+
+## 出力フォーマット
+\`\`\`
+[A03 Injection] src/api/users.ts:42 (CWE-89, High)
+原因: 文字列連結によるSQL組立
+修正: parameterized query を使う
+\`\`\`
+
+## 動作
+- diff 全体を一括レビュー
+- 既存実装の追跡コミットがある場合は原典まで遡る
+- 省略時は HEAD ブランチの未マージ差分が対象`,
+      },
+      {
+        kind: 'mcp',
+        path: '.cursor/mcp.json（Playwright MCP 追加）',
+        lang: 'json',
+        body:
+`{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "github": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
+    }
+  }
+}`,
+      },
+      {
+        kind: 'command',
+        path: '.cursor/notepads/full-review.md',
+        lang: 'md',
+        body:
+`---
+description: security-review / code-reviewer / qa-engineer の3モードを並列実行して総括レポートを作成
+---
+# 並列レビュー
+
+Agent Mode で \`@full-review <PR_NUMBER>\` で起動。
+
+Cursor の Background Agents を3つ並列起動:
+
+\`\`\`
+Background Agent 1: @security-review PR=<N>
+Background Agent 2: モード切替「コードレビューモード」で diff レビュー
+Background Agent 3: モード切替「QAエンジニアモード」で単体・E2E生成
+\`\`\`
+
+3者の出力を docs/08-review-report.md に統合し、自動修正可能な指摘は適用、人判断が必要なものは残置。`,
+      },
+    ],
+    bestPractices: [
+      { title: '3 Background Agents 並列で時間圧縮', body: 'security / code / qa を直列に回すと2-3時間。並列なら45分。Cursor Background Agents はクラウド側で同時起動でき、コスト効率も高い。' },
+      { title: '「指摘」より「修正案」', body: 'レビューコメントは修正提案コードを添える方が採用率が高い。コードレビューモードに「提案コード必須」を instructions で規約化。' },
+      { title: '自動修正対象と人判断を分離', body: 'lint/format/import順は機械が直す。設計レイヤーの指摘は人が決める。lint-staged で前者を吸収すると後者に集中できる。' },
+      { title: 'Playwright MCPでE2Eを内製化', body: 'Playwright MCP は実ブラウザを操作。受入基準のGherkinをそのまま再生できる。' },
+    ],
+    officialRefs: [
+      { label: '~/.cursor/notepads/security-review.md（テンプレ）', body: 'OWASP Top10ベースで diff を精査する Notepad。Agent Mode で @security-review として参照。PR番号を引数として渡す。' },
+      { label: 'Playwright MCP（Microsoft公式）', body: '@playwright/mcp。.cursor/mcp.json に登録すれば「QAエンジニアモード」から透過的に browser_* ツールを呼べる。' },
+      { label: 'GitHub MCP（GitHub公式）', body: 'PR/Issue/コメントを直接操作。コードレビューモードが指摘を直接 PR コメントとして投下できる。' },
+      { label: 'Cursor Background Agents（並列実行）', body: 'クラウド側で複数 Agent を並列起動。security-review / code-reviewer / qa-engineer の3者を同時に走らせ、結果を1つのレポートに統合する典型構成。' },
+    ],
+    execution: {
+      command: '@full-review 41',
+      lines: [
+        '> Background Agents 3つを並列起動',
+        '',
+        '[Background Agent 1: @security-review]',
+        '  OWASP Top10 観点でdiffを精査',
+        '  検出: 0件',
+        '',
+        '[Background Agent 2: コードレビューモード]',
+        '  PR #41-#76 を順次レビュー',
+        '  検出 24件 (INFO 18 / WARN 6 / ERROR 0)',
+        '  自動修正適用: 18件',
+        '',
+        '[Background Agent 3: QAエンジニアモード]',
+        '  単体テスト 124件生成 → 実行 ✓ カバレッジ 87.4%',
+        '  E2E 24シナリオ → Playwright MCP で実行 ✓',
+        '',
+        '✓ 完了 (44分38秒)',
+        '  Write: docs/08-review-report.md',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'docs/08-review-report.md',
+        lang: 'md',
+        body:
+`# レビュー総括レポート
+
+## サマリ
+- セキュリティ問題: 0件
+- レビュー指摘: 24件 (うち18件は自動修正済)
+- 単体テスト: 124件 / カバレッジ 87.4%
+- E2E: 24シナリオ / 全PASS
+
+## 残課題 (要対応)
+| ID | 内容 | 担当 | 期日 |
+|----|------|------|------|
+| RV-003 | InventoryResult の責務分離 | TL | 04-26 |
+| RV-007 | バーコード読取の権限 fallback | DEV | 04-27 |
+| RV-014 | 監査ログのバッチ書込再考 | ARCH | 04-30 |
+
+## ブロックなし → デプロイ準備へ`,
+      },
+    ],
+    review: {
+      skillName: '@security-review',
+      prompt:
+`OWASP Top10 (A01: Broken Access / A02: Cryptographic / A03: Injection / A07: Identification ...) 観点で diff を精査。
+検出時はファイル/行/CWE/重大度/修正案をPRコメントで返す。`,
+      comments: [
+        { level: 'OK', target: 'A03 Injection', body: 'Prisma + parameterized query。文字列連結なし' },
+        { level: 'OK', target: 'A07 Auth',      body: 'JWT検証ミドルウェアが全API Routeに適用' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 09 ─────────────────────────
+  {
+    num: '09',
+    title: 'CI/CD・デプロイ',
+    sub: 'IaCとパイプラインを生成、本番環境を立ち上げ',
+    duration: '約20分',
+    outcome: 'GitHub Actions / Terraform / 本番URL払い出し / Smoke Test PASS',
+    flow: {
+      input:     { label: 'main ブランチ',     detail: 'マージ済コード' },
+      operation: { label: '@setup-cicd',       detail: 'CI/CD構築' },
+      config:    { label: 'devops mode + GitHub MCP', detail: 'Vercel + Supabase' },
+      output:    { label: 'pipeline + infra',  detail: '稼働中の本番' },
+    },
+    configFiles: [
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/devops.json',
+        lang: 'json',
+        body:
+`{
+  "name": "DevOpsモード",
+  "description": "GitHub Actions / Terraform / Vercel / Supabase を一括構築",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "edit_file", "run_terminal_cmd", "codebase_search"],
+  "mcpServers": ["github"],
+  "autoRun": false,
+  "askBeforeEdit": true,
+  "instructions": "構築物:\n- .github/workflows/ci.yml (lint / typecheck / test / build)\n- .github/workflows/cd.yml (Vercel preview / production deploy)\n- infra/terraform/ (Supabase RLS / SFTP用VPC)\n- Dockerfile (バッチ用)\n- Smoke Test (本番疎通)\n\nセキュリティ:\n- Secrets はハードコード禁止\n- 認証は GitHub OIDC + Vercel Token\n- terraform apply は人間承認後のみ実行 (autoRun: ask)"
+}`,
+      },
+      {
+        kind: 'mcp',
+        path: '.cursor/mcp.json（GitHub MCP 再掲）',
+        lang: 'json',
+        body:
+`{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_TOKEN}"
+      }
+    }
+  }
+}`,
+      },
+      {
+        kind: 'hook',
+        path: '.husky/post-commit（IaC変更検知）',
+        lang: 'bash',
+        body:
+`#!/usr/bin/env bash
+# Cursor Agent が commit した直後に husky 経由で実行される
+# infra/ 配下に変更があれば terraform plan の確認を促す
+set -e
+
+if git diff --name-only HEAD~1 HEAD | grep -q '^infra/'; then
+  echo "ℹ IaC変更検知。terraform plan の確認を推奨。"
+  echo "  cd infra/terraform && terraform plan"
+fi`,
+      },
+    ],
+    bestPractices: [
+      { title: 'Secretsは GitHub OIDC で短期発行', body: 'long-lived token は流出した瞬間に詰む。OIDCは数分有効、ジョブ完了で失効。' },
+      { title: 'terraform plan を必ずPRに添付', body: 'apply は承認後の手動。インフラ変更は「読んでから動かす」が大原則。' },
+      { title: 'ロールバック手順をRunbookに先に書く', body: 'デプロイ手順書よりロールバック手順書の方が緊急時に必要。順番に注意。' },
+      { title: 'Smoke Testで本番疎通を1秒で検知', body: '/api/health + 主要画面1本だけでよい。デプロイ完了≠正常稼働。' },
+    ],
+    officialRefs: [
+      { label: 'GitHub MCP（GitHub公式）', body: 'PR作成・Action実行・Release管理。DevOpsモードの主要連携先。' },
+      { label: 'Cursor 公式: Configuration Reference', body: 'agent.defaultModel / agent.autoRun / agent.allowedWritePaths / mcpServers など .cursor/settings.json の全項目は docs.cursor.com を参照。' },
+    ],
+    execution: {
+      command: '@setup-cicd',
+      lines: [
+        '> 「DevOpsモード」に切替...',
+        '  GitHub Actions ワークフロー生成 (ci.yml / cd.yml)',
+        '  Terraform module: supabase_project / sftp_vpc',
+        '  Dockerfile: バッチ連携コンテナ',
+        '  Vercel 接続 (mcp__github__create_repository)',
+        '',
+        '  terraform plan',
+        '    + supabase_project.kakuu',
+        '    + supabase_storage.csv_inbox',
+        '    + aws_vpc.sftp_bridge',
+        '  terraform apply (承認後実行)',
+        '',
+        '  Vercel deploy production',
+        '    https://kakuu-stock.vercel.app',
+        '',
+        '  Smoke Test:',
+        '    GET /api/health → 200 ✓',
+        '    GET /inventory?code=A-001 → 200 ✓',
+        '',
+        '✓ 完了 (19分04秒)',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: '.github/workflows/ci.yml',
+        lang: 'yaml',
+        body:
+`name: CI
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test --coverage
+      - run: pnpm build
+      - uses: codecov/codecov-action@v4`,
+      },
+      {
+        name: 'infra/terraform/main.tf',
+        lang: 'hcl',
+        body:
+`terraform {
+  required_providers {
+    supabase = { source = "supabase/supabase", version = "~> 1.0" }
+    aws      = { source = "hashicorp/aws", version = "~> 5.0" }
+  }
+}
+
+resource "supabase_project" "kakuu" {
+  organization_id = var.supabase_org_id
+  name            = "kakuu-stock-prod"
+  region          = "ap-northeast-1"
+  db_pass         = var.db_password
+}
+
+resource "aws_vpc" "sftp_bridge" {
+  cidr_block = "10.20.0.0/16"
+  tags = { Name = "kakuu-sftp-bridge" }
+}`,
+      },
+    ],
+    review: {
+      skillName: '@cd-review',
+      prompt: 'パイプラインのSecrets取り回し、本番Apply前の承認フロー、ロールバック手順をチェック。',
+      comments: [
+        { level: 'OK',   target: 'Secrets',       body: 'GitHub OIDC + Vercel Token, ハードコード一切なし' },
+        { level: 'INFO', target: 'ロールバック', body: 'Vercel rollback コマンドをRunbook 09-2に記載済' },
+      ],
+    },
+  },
+
+  // ───────────────────────── 10 ─────────────────────────
+  {
+    num: '10',
+    title: '保守運用',
+    sub: '定期ジョブと障害対応をエージェントで自動化',
+    duration: '常時稼働',
+    outcome: '監視ダッシュ / Runbook / 週次レポート自動生成 / インシデントPostMortem',
+    flow: {
+      input:     { label: '本番運用ログ',           detail: 'Datadog / Vercel logs' },
+      operation: { label: 'cursor-agent --print',  detail: '外部スケジューラから起動' },
+      config:    { label: '@incident-respond + Notepad', detail: 'cron + Custom Mode' },
+      output:    { label: 'reports/ + Runbook/',   detail: '運用ドキュメント' },
+    },
+    configFiles: [
+      {
+        kind: 'harness',
+        path: 'launchd / cron（外部スケジューラから cursor-agent 起動）',
+        lang: 'bash',
+        body:
+`# crontab -e
+# 毎朝9時 JST に Cursor CLI (cursor-agent) を非対話モードで起動
+TZ=Asia/Tokyo
+0 9 * * * /usr/local/bin/cursor-agent \\
+  --print \\
+  --mode prod-readonly \\
+  --workspace /opt/kakuu-stock \\
+  "@health-check 24h を実行し、エラー率/レスポンス分布/CSV連携成否を Datadog MCP 経由で取得し reports/daily/$(date +\\%Y-\\%m-\\%d).md にまとめる。閾値超えがあれば Slack に通知。" \\
+  >> /var/log/cursor/daily-health.log 2>&1
+
+# Cursor 単体には cron 機能が無いため、launchd / cron / systemd timer / GitHub Actions 等の
+# 外部スケジューラから cursor-agent CLI を呼び出す運用が公式推奨パターン
+# --mode で参照する Custom Mode は .cursor/modes/ または ~/.cursor/modes/ から読み込まれる`,
+      },
+      {
+        kind: 'skill',
+        path: '~/.cursor/notepads/postmortem.md',
+        lang: 'md',
+        body:
+`---
+description: 障害発生時、ログ・タイムライン・影響範囲・根本原因・再発防止を5 Whysで分析しPostMortemを生成
+---
+# PostMortem テンプレート
+
+Agent Mode で \`@postmortem <INC-ID>\` で参照する。
+
+## 概要
+発生日時 / 検知日時 / 復旧日時 / 影響範囲
+
+## タイムライン
+| 時刻 | 出来事 | 担当 |
+
+## 根本原因 (5 Whys)
+1. なぜ発生したか
+2. なぜ防げなかったか
+...
+
+## 再発防止
+- 短期(48h以内): ...
+- 中期(2週間以内): ...
+- 長期(次四半期): ...
+
+## NG表現
+- 「気をつける」「徹底する」「意識する」は再発防止として認めない
+- 必ず「仕組み」「自動化」「ガードレール化」で書く`,
+      },
+      {
+        kind: 'mcp',
+        path: '~/.cursor/mcp.json（Datadog / Slack MCP 追加）',
+        lang: 'json',
+        body:
+`{
+  "mcpServers": {
+    "datadog": {
+      "command": "npx",
+      "args": ["-y", "@datadog/mcp-server-datadog"],
+      "env": {
+        "DD_API_KEY": "\${DD_API_KEY}",
+        "DD_APP_KEY": "\${DD_APP_KEY}",
+        "DD_SITE": "datadoghq.com"
+      }
+    },
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-slack"],
+      "env": {
+        "SLACK_BOT_TOKEN": "\${SLACK_BOT_TOKEN}"
+      }
+    }
+  }
+}`,
+      },
+      {
+        kind: 'subagent',
+        path: '.cursor/modes/incident-responder.json',
+        lang: 'json',
+        body:
+`{
+  "name": "障害対応モード",
+  "description": "アラート受信時、ログ集約 → タイムライン構築 → 5 Whys → 仮説提示 → Slack共有まで自動化",
+  "model": "claude-sonnet-4.5",
+  "tools": ["read_file", "edit_file", "codebase_search"],
+  "mcpServers": ["datadog", "slack"],
+  "autoRun": true,
+  "instructions": "動作:\n1. Datadog MCP で発生時刻前後30分のメトリクス・ログを取得\n2. タイムラインに整形\n3. @postmortem Notepad を適用し 5 Whys を実行\n4. 根本原因候補を3つ提示（確信度付き）\n5. Slack #incident に共有、対応方針を募る"
+}`,
+      },
+      {
+        kind: 'command',
+        path: '.cursor/notepads/incident-respond.md',
+        lang: 'md',
+        body:
+`---
+description: 障害IDを引数に「障害対応モード」を起動、PostMortemドラフトまで作成
+---
+# 障害対応パイプライン
+
+Agent Mode で \`@incident-respond INC-YYYY-MM-DD\` で起動。
+
+1. 「障害対応モード」(.cursor/modes/incident-responder.json) に切替
+2. Datadog MCP で関連ログを集約
+3. @postmortem Notepad を適用
+4. ドラフトを incidents/<INC-ID>/postmortem.md に書き出す`,
+      },
+    ],
+    bestPractices: [
+      { title: '定期トリガーで「報告書を書く時間」を週次から日次に圧縮', body: '人が書くと「週次がやっと」。エージェントなら日次で粒度が上がる。' },
+      { title: '5 Whysは「組織課題」まで掘る', body: 'なぜ→「徹底できなかった」で止めると再発する。「なぜ徹底できない仕組みか？」まで掘る。' },
+      { title: '再発防止に期日を必ず明記', body: '短期48h / 中期2週間 / 長期次四半期。期日のない対策は実装されない。' },
+      { title: '「気をつける」を禁則ワードに', body: '@postmortem Notepad 内で NG 表現として明記。仕組み・自動化・ガードレール化で書かせる。' },
+      { title: 'インシデント検知→Slack共有を1分以内', body: '障害対応モード + Slack MCP で初動を自動化。人間は「方針判断」だけに集中。' },
+    ],
+    officialRefs: [
+      { label: 'cursor-agent CLI（非対話モード）', body: '--print / --mode / --workspace 等で外部スケジューラから起動可能。launchd / cron / systemd timer / GitHub Actions と組合せる。' },
+      { label: 'Slack MCP（公式提供）', body: '@modelcontextprotocol/server-slack。チャネル投稿・スレッド返信・ユーザー検索が標準操作。' },
+      { label: 'Datadog MCP（Datadog公式）', body: 'メトリクス/ログ/モニタを Cursor Agent から直接取得。インシデント対応で必須。' },
+      { label: 'modes.profiles.prod-readonly（Cursor 設定）', body: 'cron 実行用プロファイル。autoRun: "never" + allowedWritePaths: [] で完全自律＋安全境界を両立。' },
+    ],
+    execution: {
+      command: '@health-check 24h（cron 起動）',
+      lines: [
+        '> 外部スケジューラ (cron / launchd) から cursor-agent --print 起動...',
+        '  mode: prod-readonly',
+        '  autoRun=never / readOnly=true',
+        '',
+        '--- 翌朝9時 自動実行 ---',
+        '> @health-check 24h',
+        '  Datadog MCP: APM metrics 取得 (24h)',
+        '  エラー率: 0.04% (閾値0.5%以下)',
+        '  p95レスポンス: 1.2s (閾値2.0s以下)',
+        '  CSV連携: 全1件成功',
+        '',
+        '  Write: reports/daily/2026-04-26.md',
+        '  notify: Slack #ops にサマリ送付',
+        '✓ 完了',
+        '',
+        '--- 障害発生時 ---',
+        '> @incident-respond INC-2026-04-30',
+        '  「障害対応モード」に切替',
+        '  Datadog ログ取得 → タイムライン構築',
+        '  @postmortem Notepad を適用',
+        '  5 Whys 自動分析 → 根本原因候補3つ提示',
+        '  Slack #incident に共有',
+        '  Write: incidents/INC-2026-04-30/postmortem.md',
+      ],
+    },
+    artifactsOut: [
+      {
+        name: 'reports/weekly/2026-W17.md',
+        lang: 'md',
+        body:
+`# 週次運用レポート 2026-W17
+
+## サマリ
+- 稼働率: 99.97% (SLO 99.5% 達成)
+- 平均レスポンス: 0.8s
+- 取引件数: 14,820件
+- インシデント: 0件
+
+## トレンド
+- 在庫照会のp95が前週比+12% (1.07s → 1.21s)
+- 大田拠点のCSV連携が3日連続で1分遅延
+  → 原因: SFTP接続タイムアウト
+  → 対応: 次週中に接続プール拡張 (Issue #182)
+
+## 来週の予定メンテ
+- 04-30 02:00-04:00 Supabase メジャーアップデート`,
+      },
+      {
+        name: 'incidents/INC-2026-04-30/postmortem.md',
+        lang: 'md',
+        body:
+`# INC-2026-04-30 PostMortem
+
+## 概要
+- 発生 13:42 / 検知 13:43 / 復旧 14:11 (29分)
+- 影響: 大田拠点のバーコード入出庫が一時停止 (取引数 0)
+
+## タイムライン
+| 時刻 | 出来事 |
+|------|--------|
+| 13:42 | API 5xx 急増 (Datadog アラート発火) |
+| 13:43 | オンコール検知、Slack #incident |
+| 13:50 | 原因切り分け: 大田 VPN 切断 |
+| 14:05 | 自動フェイルオーバー手順実行 |
+| 14:11 | 全拠点で復旧確認 |
+
+## 根本原因 (5 Whys)
+1. なぜ停止? → 大田-本社間のVPN切断
+2. なぜ切断? → 拠点ルータのファーム自動更新
+3. なぜ自動更新? → メンテ枠の合意がなかった
+4. なぜ合意なし? → 拠点ネットワーク変更の連絡経路が未整備
+5. なぜ未整備? → 開発スコープ外として後回し
+
+## 再発防止
+- 短期: ルータ自動更新を停止 (本日中)
+- 中期: 拠点ネットワーク変更の連絡経路を明文化 (2週間)
+- 長期: 拠点フェイルオーバーをアプリ層で吸収するADR追加 (次四半期)`,
+      },
+    ],
+    review: {
+      skillName: '@postmortem',
+      prompt: '5 Whysが浅くないか、再発防止が「気をつける」「徹底する」で終わっていないか、期日が明示されているかチェック。',
+      comments: [
+        { level: 'OK', target: '5 Whys',     body: '組織課題まで掘り下げ' },
+        { level: 'OK', target: '再発防止',   body: '短期/中期/長期に分かれ、期日明示' },
+      ],
+    },
+  },
+];
