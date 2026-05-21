@@ -226,7 +226,7 @@ function renderPhase(phase, index) {
         : [h('p', { style: 'color:var(--ink-3)' }, '前工程の成果物を入力とする')],
     },
     { id: 'cfg', label: 'ツール設定・指示', render: () => renderConfigPanel(phase) },
-    { id: 'run', label: 'チャット実演', render: () => [renderTerminal(phase.execution)] },
+    { id: 'run', label: 'AIへの依頼', render: () => [renderTerminal(phase.execution)] },
     { id: 'out', label: '成果物', render: () => phase.artifactsOut.map(renderFile) },
     { id: 'rev', label: 'レビュー', render: () => renderReview(phase.review) },
   ];

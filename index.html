@@ -52,8 +52,10 @@
     .card:hover .card-cta{background:var(--red);}
     .card-cta::after{content:"";width:7px;height:7px;border-top:2px solid #fff;
       border-right:2px solid #fff;transform:rotate(45deg);}
+    .hub-logo{display:block;width:120px;height:auto;margin:0 0 32px;opacity:0.92;}
+    .hub-footer-logo{height:22px;width:auto;opacity:0.55;margin:0 auto;}
     .footer{margin-top:64px;padding-top:22px;border-top:1px solid var(--line);
-      display:flex;justify-content:space-between;font-size:12px;color:var(--ink-4);flex-wrap:wrap;gap:8px;}
+      display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink-4);flex-wrap:wrap;gap:8px;}
     @media (max-width:760px){
       .wrap{padding:48px 20px 64px;}
       h1{font-size:26px;}
@@ -63,6 +65,7 @@
 </head>
 <body>
   <div class="wrap">
+    <img class="hub-logo" src="./assets/givery-logo.png" alt="Givery">
     <span class="tag">商談用 / 説明資料</span>
     <h1>同じ案件を、<em>4つの進め方</em>で<br>要件定義から保守運用まで通す</h1>
     <p class="lead">1件の架空案件を題材に、顧客ヒアリングから本番運用までの10工程を、開発スタイル別に再現したデモ集です。どのカードも入力・操作・設定・成果が工程ごとに並び、実際の設定ファイルやプロンプトをそのまま確認できます。</p>
@@ -134,6 +137,7 @@
 
     <div class="footer">
       <div>架空案件「架空株式会社（フィクション）」をもとに、開発スタイル別の実運用を再現した商談用デモ集</div>
+      <img class="hub-footer-logo" src="./assets/givery-logo.png" alt="Givery">
       <div>v1.0 / 2026-05</div>
     </div>
   </div>

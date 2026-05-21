@@ -161,7 +161,7 @@ allowed-tools: Read, Write, Task
       { label: 'Anthropic公式ドキュメント: Sub-agents', body: '.claude/agents/*.md のフォーマットと、ツール権限の最小化原則を提示。' },
     ],
     execution: {
-      command: '/extract-requirements transcripts/kakuu-2026-04-15.txt',
+      command: '添付の transcripts/kakuu-2026-04-15.txt から、機能要求／非機能要求／制約／ステークホルダーを表形式で抽出してください。各行に発言者とタイムスタンプを必ず残し、計測不能な表現は【要具体化】を付けてください。',
       lines: [
         '> /extract-requirements カスタムコマンドを実行',
         '  Step 1: @req-extractor を起動',
@@ -299,7 +299,7 @@ model: sonnet
       { label: '/agents', body: 'prioritizer の AskUserQuestion 権限はここで対話的に設定可能。' },
     ],
     execution: {
-      command: '/prioritize docs/01-requirements-raw.md',
+      command: 'docs/01-requirements-raw.md の要求を MoSCoW で分類してください。確信度が中・低で Must 候補のものは即断せず、選択肢を出して私に確認してください。Must 比率が 40% を超えたら警告してください。',
       lines: [
         '> prioritizer エージェントを起動...',
         '  分類処理: 48件 / 12件 / 7件',
@@ -474,7 +474,7 @@ description: 要件定義書(RDD)の標準テンプレートを適用。ISO/IEC/
       { label: 'Anthropic公式ドキュメント: Hooks', body: '8種のイベント (PreToolUse/PostToolUse/UserPromptSubmit/Notification/Stop/SubagentStop/PreCompact/SessionStart/SessionEnd) と matcher / type / command / timeout の仕様。' },
     ],
     execution: {
-      command: '/generate-rdd docs/02-requirements-final.md',
+      command: 'rdd-template スキルと docs/02-requirements-final.md を使って、要件定義書 v1.0 を docs/03-requirements-definition.md に書き出してください。図は Mermaid、各機能要件章の末尾に関連要求IDを必ず付けてください。',
       lines: [
         '> rdd-template スキルを適用',
         '  CLAUDE.md 規約を読込: 章構成 / トレーサ / 図表ルール',
@@ -629,7 +629,7 @@ Feature: ...
       { label: 'Anthropic公式ドキュメント: Sub-agents', body: '専門エージェントごとに model を選び分けることで、コストと性能を両立する設計指針を提示。' },
     ],
     execution: {
-      command: '/spec-out docs/03-requirements-definition.md',
+      command: 'docs/03-requirements-definition.md から、ユーザーストーリー（US-XXX）と Gherkin の受入基準を specification/ 配下に生成してください。13pt を超えるストーリーは分割案も併記してください。',
       lines: [
         '> spec-writer エージェントを起動...',
         '  機能要件 24項 → ユーザーストーリー候補に変換中',
@@ -790,7 +790,7 @@ model: opus
       { label: 'Anthropic公式ドキュメント: Model Context Protocol', body: 'stdio / HTTP / SSE のトランスポート、認可フロー、サーバー実装ガイド。' },
     ],
     execution: {
-      command: '/design-architecture specification/',
+      command: 'specification/ 一式から、アーキテクチャ・DB・API設計を design/basic/ に作成してください。意思決定が発生するたびに ADR を design/basic/adr/ に残し、代替案と却下理由まで書いてください。',
       lines: [
         '> architect エージェントを起動...',
         '  C4 L1 System Context を生成',
@@ -936,7 +936,7 @@ model: opus
       { label: 'Anthropic公式ドキュメント: Sub-agents', body: 'tools フィールドで権限を Read, Write のみに絞ると、設計フェーズで誤って Bash 実行する事故を防げる。' },
     ],
     execution: {
-      command: '/detailed-design design/basic/ specification/stories/',
+      command: 'design/basic/ と specification/stories/ から詳細設計を design/detail/ に生成してください。異常系シーケンスは正常系の0.5倍以上、エラーコードは E_<ドメイン>_<連番3桁> の命名規約に揃えてください。',
       lines: [
         '> detail-designer エージェントを起動...',
         '  Read: 基本設計書 / ユーザーストーリー36本',
@@ -1240,7 +1240,7 @@ allowed-tools: Read, Write, Edit, Bash, Task
       { label: 'includeCoAuthoredBy（公式設定）', body: 'true にすると Claude が作成するcommitに Co-Authored-By: Claude <noreply@anthropic.com> を自動付与。' },
     ],
     execution: {
-      command: '/implement-feature US-001',
+      command: 'US-001（リアルタイム在庫照会）を実装してください。詳細設計のシーケンスと入力検証マトリクスに従って、API Route／Server Action／Repository／Vitest テストを一式、省略せず完全形で出してください。',
       lines: [
         '> US-001 リアルタイム在庫照会 を実装します',
         '  Read: design/detail/ + specification/stories/US-001.md',
@@ -1459,7 +1459,7 @@ allowed-tools: Task, Read, Write, Bash
       { label: 'Agent 並列実行（公式機能）', body: '単一メッセージで複数 Task tool 呼び出しを並列発行する公式パターン。' },
     ],
     execution: {
-      command: '/full-review 41',
+      command: 'PR #41 のソース一式について、Gherkin 受入基準を Vitest テストに変換して実行し、pass/fail を表で示してください。あわせて型エラー・不変性違反・例外処理の境界もレビューしてください。',
       lines: [
         '> 並列実行 (3エージェント)',
         '',
@@ -1601,7 +1601,7 @@ model: opus
       { label: 'Anthropic公式ドキュメント: Settings', body: 'env / model / permissions / hooks / includeCoAuthoredBy など、settings.json で制御できる項目の一覧。' },
     ],
     execution: {
-      command: '/setup-cicd',
+      command: '今回のリリース（US-001〜036 / マイグレーション1件）について、CI/CD パイプラインとデプロイ手順書を作成してください。ロールバック手順は手順書の冒頭に置き、環境変数チェックリストは落ちる順に並べてください。',
       lines: [
         '> devops エージェントを起動...',
         '  GitHub Actions ワークフロー生成 (ci.yml / cd.yml)',
@@ -1815,7 +1815,7 @@ postmortem skill を適用し、ドラフトを incidents/\$ARGUMENTS/postmortem
       { label: '/agents で incident-responder を有効化', body: '通常時はサブエージェントを sleep 状態にし、コンテキストを汚さない運用が推奨。' },
     ],
     execution: {
-      command: 'CronCreate name=daily-health-check',
+      command: '毎朝9時に自動起動するルーチンを設定して、直近24時間のエラー率／p95レスポンス／CSV連携成否を reports/daily/YYYY-MM-DD.md にまとめてください。閾値（エラー率0.5% / p95 2.0s）を超えていれば Slack の #ops に通知してください。',
       lines: [
         '> 定期トリガーを登録...',
         '  cron: 0 9 * * * (毎朝9時 JST)',

@@ -67,13 +67,14 @@ function renderFile(file) {
   ]);
 }
 
-// ---- terminal ----
+// ---- chat panel（Cursor への日本語依頼を再現）----
 function renderTerminal(execution) {
+  const tool = execution.tool || 'Cursor';
   const body = h('div', { class: 'terminal-body' });
   const cmdLine = h('div', {}, [
-    h('span', { class: 'terminal-prompt' }, '$ cursor-agent'),
+    h('span', { class: 'terminal-prompt' }, '> ' + tool + ' に日本語で依頼'),
     h('br'),
-    h('span', { class: 'terminal-prompt' }, '> '),
+    h('span', { class: 'terminal-prompt' }, 'あなた: '),
     h('span', { class: 'terminal-cmd' }, execution.command),
     h('br'), h('br'),
   ]);
@@ -112,15 +113,15 @@ function renderTerminal(execution) {
     class: 'terminal-run',
     onclick: () => {
       runBtn.disabled = true;
-      runBtn.textContent = '実行中...';
+      runBtn.textContent = '応答中...';
       playLines();
     },
-  }, '実行');
+  }, '送信');
 
   body.appendChild(cmdLine);
   body.appendChild(linesContainer);
-  // 初期は空。実行ボタンでタイプライター演出
-  const initHint = h('span', { class: 'terminal-line', style: 'color:#777' }, '右上「実行」ボタンを押すと出力が流れます\n');
+  // 初期は空。送信ボタンでタイプライター演出
+  const initHint = h('span', { class: 'terminal-line', style: 'color:#777' }, '右上「送信」ボタンを押すと AI の応答が流れます\n');
   linesContainer.appendChild(initHint);
 
   return h('div', { class: 'terminal' }, [
@@ -130,7 +131,7 @@ function renderTerminal(execution) {
         h('span', { class: 'terminal-dot' }),
         h('span', { class: 'terminal-dot' }),
       ]),
-      h('div', { class: 'terminal-title' }, 'Cursor'),
+      h('div', { class: 'terminal-title' }, tool),
       runBtn,
     ]),
     body,
@@ -226,7 +227,7 @@ function renderPhase(phase, index) {
         : [h('p', { style: 'color:var(--ink-3)' }, '前工程の成果物を入力とする')],
     },
     { id: 'cfg', label: 'Cursor 設定', render: () => renderConfigPanel(phase) },
-    { id: 'run', label: '実行', render: () => [renderTerminal(phase.execution)] },
+    { id: 'run', label: 'AIへの依頼', render: () => [renderTerminal(phase.execution)] },
     { id: 'out', label: '成果物', render: () => phase.artifactsOut.map(renderFile) },
     { id: 'rev', label: 'レビュー', render: () => renderReview(phase.review) },
   ];

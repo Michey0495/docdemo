@@ -165,7 +165,7 @@ argument-hint: <transcript-path>
       { label: 'OpenAI公式ドキュメント: Subagents', body: '~/.codex/agents/*.toml の必須フィールド (name/description/developer_instructions) と、model/sandbox_mode 等の任意オーバーライド。' },
     ],
     execution: {
-      command: '/extract-requirements transcripts/kakuu-2026-04-15.txt',
+      command: '添付の transcripts/kakuu-2026-04-15.txt から、機能要求／非機能要求／制約／ステークホルダーを表形式で抽出してください。各行に発言者とタイムスタンプを必ず残し、計測不能な表現は【要具体化】を付けてください。',
       lines: [
         '> /extract-requirements カスタムコマンドを実行',
         '  Step 1: req_extractor サブエージェントを spawn',
@@ -301,7 +301,7 @@ network_access = false`,
       { label: 'sandbox_mode（公式設定）', body: 'read-only / workspace-write / danger-full-access。書き込み範囲を sandbox_workspace_write.writable_roots で限定。' },
     ],
     execution: {
-      command: '/prioritize docs/01-requirements-raw.md',
+      command: 'docs/01-requirements-raw.md の要求を MoSCoW で分類してください。確信度が中・低で Must 候補のものは即断せず、選択肢を出して私に確認してください。Must 比率が 40% を超えたら警告してください。',
       lines: [
         '> prioritizer エージェントを起動...',
         '  分類処理: 48件 / 12件 / 7件',
@@ -480,7 +480,7 @@ statusMessage = "docs/ の WARN/ERROR を点検"`,
       { label: 'OpenAI公式ドキュメント: Hooks', body: 'config.toml インライン or ~/.codex/hooks.json で定義可能。プロジェクト範囲のフックは trusted プロジェクトのみ読み込み。' },
     ],
     execution: {
-      command: '/generate-rdd docs/02-requirements-final.md',
+      command: 'rdd-template スキルと docs/02-requirements-final.md を使って、要件定義書 v1.0 を docs/03-requirements-definition.md に書き出してください。図は Mermaid、各機能要件章の末尾に関連要求IDを必ず付けてください。',
       lines: [
         '> /rdd-template スキルを適用',
         '  AGENTS.md 規約を読込: 章構成 / トレーサ / 図表ルール',
@@ -636,7 +636,7 @@ Feature: ...
       { label: 'OpenAI公式ドキュメント: Subagents', body: '専門エージェントごとに model を選び分けることで、コストと性能を両立する設計指針を提示。[agents] max_threads 6 で並列上限を制御。' },
     ],
     execution: {
-      command: '/spec-out docs/03-requirements-definition.md',
+      command: 'docs/03-requirements-definition.md から、ユーザーストーリー（US-XXX）と Gherkin の受入基準を specification/ 配下に生成してください。13pt を超えるストーリーは分割案も併記してください。',
       lines: [
         '> spec-writer エージェントを起動...',
         '  機能要件 24項 → ユーザーストーリー候補に変換中',
@@ -799,7 +799,7 @@ enabled_tools = ["create_pr", "list_issues", "comment_issue"]`,
       { label: 'OpenAI公式ドキュメント: Model Context Protocol', body: 'stdio / HTTP / SSE のトランスポート、認可フロー、サーバー実装ガイド。' },
     ],
     execution: {
-      command: '/design-architecture specification/',
+      command: 'specification/ 一式から、アーキテクチャ・DB・API設計を design/basic/ に作成してください。意思決定が発生するたびに ADR を design/basic/adr/ に残し、代替案と却下理由まで書いてください。',
       lines: [
         '> architect エージェントを起動...',
         '  C4 L1 System Context を生成',
@@ -946,7 +946,7 @@ developer_instructions = """
       { label: 'OpenAI公式ドキュメント: Subagents', body: 'sandbox_mode を read-only に設定するか、書き込みを必要とする agent では writable_roots を限定すると、設計フェーズで誤って外部に書き出す事故を防げる。' },
     ],
     execution: {
-      command: '/detailed-design design/basic/ specification/stories/',
+      command: 'design/basic/ と specification/stories/ から詳細設計を design/detail/ に生成してください。異常系シーケンスは正常系の0.5倍以上、エラーコードは E_<ドメイン>_<連番3桁> の命名規約に揃えてください。',
       lines: [
         '> detail-designer エージェントを起動...',
         '  Read: 基本設計書 / ユーザーストーリー36本',
@@ -1239,7 +1239,7 @@ argument-hint: <US-XXX>
       { label: '[profiles.NAME]（公式設定）', body: 'profile を切り替えるだけで approval_policy / sandbox_mode / model を一括変更。strict プロファイルでレビュー時のみ read-only に。' },
     ],
     execution: {
-      command: '/implement-feature US-001',
+      command: 'US-001（リアルタイム在庫照会）を実装してください。詳細設計のシーケンスと入力検証マトリクスに従って、API Route／Server Action／Repository／Vitest テストを一式、省略せず完全形で出してください。',
       lines: [
         '> US-001 リアルタイム在庫照会 を実装します',
         '  Read: design/detail/ + specification/stories/US-001.md',
@@ -1469,7 +1469,7 @@ qa_engineer         "PR #$1 のストーリーから単体・E2Eテストを生�
       { label: '[agents] max_threads / max_depth（公式設定）', body: 'max_threads=6 で並列スポーン上限、max_depth=1 で再帰防止。並列レビューはこの上限内で発行。' },
     ],
     execution: {
-      command: '/full-review 41',
+      command: 'PR #41 のソース一式について、Gherkin 受入基準を Vitest テストに変換して実行し、pass/fail を表で示してください。あわせて型エラー・不変性違反・例外処理の境界もレビューしてください。',
       lines: [
         '> 並列スポーン (3 subagents, max_threads=6)',
         '',
@@ -1612,7 +1612,7 @@ statusMessage = "infra/ 配下の変更を点検"`,
       { label: 'OpenAI公式ドキュメント: Configuration Reference', body: 'model / approval_policy / sandbox_mode / [features] / [mcp_servers] / [hooks] / notify など config.toml の全項目を網羅。' },
     ],
     execution: {
-      command: '/setup-cicd',
+      command: '今回のリリース（US-001〜036 / マイグレーション1件）について、CI/CD パイプラインとデプロイ手順書を作成してください。ロールバック手順は手順書の冒頭に置き、環境変数チェックリストは落ちる順に並べてください。',
       lines: [
         '> devops エージェントを起動...',
         '  GitHub Actions ワークフロー生成 (ci.yml / cd.yml)',
@@ -1829,7 +1829,7 @@ postmortem skill を適用し、ドラフトを incidents/$1/postmortem.md に�
       { label: '[profiles.prod-readonly]（公式設定）', body: 'cron 実行用プロファイル。approval_policy="never" + sandbox_mode="read-only" で完全自律＋安全境界を両立。' },
     ],
     execution: {
-      command: '/health-check 24h（cron 起動）',
+      command: '毎朝9時に自動起動するルーチンを設定して、直近24時間のエラー率／p95レスポンス／CSV連携成否を reports/daily/YYYY-MM-DD.md にまとめてください。閾値（エラー率0.5% / p95 2.0s）を超えていれば Slack の #ops に通知してください。',
       lines: [
         '> 外部スケジューラ (cron / launchd) から codex exec 起動...',
         '  profile: prod-readonly',

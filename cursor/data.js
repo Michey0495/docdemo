@@ -147,7 +147,7 @@ Agent Mode で \`@extract-requirements <transcript-path>\` と打つと、この
       { label: 'Cursor公式ドキュメント: Rules', body: 'docs.cursor.com/context/rules を参照。MDC形式の frontmatter は description / globs / alwaysApply の3点。User Rules は Settings > Rules で全プロジェクト共通として設定。' },
     ],
     execution: {
-      command: '@extract-requirements transcripts/kakuu-2026-04-15.txt',
+      command: '添付の transcripts/kakuu-2026-04-15.txt から、機能要求／非機能要求／制約／ステークホルダーを表形式で抽出してください。各行に発言者とタイムスタンプを必ず残し、計測不能な表現は【要具体化】を付けてください。',
       lines: [
         '> @extract-requirements Notepad を Agent Mode に読込',
         '  Step 1: 「要求抽出モード」に切替',
@@ -271,7 +271,7 @@ Agent Mode で \`@extract-requirements <transcript-path>\` と打つと、この
       { label: 'agent.allowedWritePaths / .cursorignore', body: '書き込み許可ディレクトリを限定。.cursorignore に書いたパターンは Agent から不可視。AI 学習対象から外す場合は .cursorindexingignore も併用。' },
     ],
     execution: {
-      command: '@prioritize docs/01-requirements-raw.md',
+      command: 'docs/01-requirements-raw.md の要求を MoSCoW で分類してください。確信度が中・低で Must 候補のものは即断せず、選択肢を出して私に確認してください。Must 比率が 40% を超えたら警告してください。',
       lines: [
         '> 「優先度判定モード」に切替...',
         '  分類処理: 48件 / 12件 / 7件',
@@ -450,7 +450,7 @@ npx lint-staged`,
       { label: '.cursor/environment.json（Background Agent）', body: 'Cursor Background Agents 専用の環境定義ファイル。install / terminals / snapshot を記述し、クラウド側で再現可能な実行環境を整える。' },
     ],
     execution: {
-      command: '@generate-rdd docs/02-requirements-final.md',
+      command: 'rdd-template スキルと docs/02-requirements-final.md を使って、要件定義書 v1.0 を docs/03-requirements-definition.md に書き出してください。図は Mermaid、各機能要件章の末尾に関連要求IDを必ず付けてください。',
       lines: [
         '> @rdd-template Notepad を適用',
         '  .cursor/rules/doc-conventions.mdc を読込: 章構成 / トレーサ / 図表ルール',
@@ -593,7 +593,7 @@ Feature: ...
       { label: 'Cursor 公式: Background Agents', body: 'クラウド側で並列実行できる Agent。長時間タスクや並列レビュー向け。.cursor/environment.json で実行環境を定義し、Web UI / CLI から起動可能。' },
     ],
     execution: {
-      command: '@spec-out docs/03-requirements-definition.md',
+      command: 'docs/03-requirements-definition.md から、ユーザーストーリー（US-XXX）と Gherkin の受入基準を specification/ 配下に生成してください。13pt を超えるストーリーは分割案も併記してください。',
       lines: [
         '> 「仕様起こしモード」に切替...',
         '  機能要件 24項 → ユーザーストーリー候補に変換中',
@@ -747,7 +747,7 @@ Feature: 在庫照会
       { label: 'Model Context Protocol（公式仕様）', body: 'stdio / HTTP / SSE のトランスポート、認可フロー、サーバー実装ガイドは modelcontextprotocol.io を参照。' },
     ],
     execution: {
-      command: '@design-architecture specification/',
+      command: 'specification/ 一式から、アーキテクチャ・DB・API設計を design/basic/ に作成してください。意思決定が発生するたびに ADR を design/basic/adr/ に残し、代替案と却下理由まで書いてください。',
       lines: [
         '> 「アーキ設計モード」に切替...',
         '  C4 L1 System Context を生成',
@@ -889,7 +889,7 @@ PostgreSQL を採用する。
       { label: 'Cursor 公式: Custom Mode 権限', body: 'Custom Mode の autoRun: never と allowedWritePaths を限定すれば、設計フェーズで誤って外部に書き出す事故を防げる。読み取り専用にしたい場合は tools から edit_file を除外する。' },
     ],
     execution: {
-      command: '@detailed-design design/basic/ specification/stories/',
+      command: 'design/basic/ と specification/stories/ から詳細設計を design/detail/ に生成してください。異常系シーケンスは正常系の0.5倍以上、エラーコードは E_<ドメイン>_<連番3桁> の命名規約に揃えてください。',
       lines: [
         '> 「詳細設計モード」に切替...',
         '  Read: 基本設計書 / ユーザーストーリー36本',
@@ -1169,7 +1169,7 @@ Agent Mode で \`@implement-feature US-XXX\` で起動。
       { label: 'modes.profiles（Cursor 設定）', body: '.cursor/settings.json の modes.profiles で strict / dev / prod など複数プロファイルを定義。レビュー時のみ allowedWritePaths: [] にする運用が定番。' },
     ],
     execution: {
-      command: '@implement-feature US-001',
+      command: 'US-001（リアルタイム在庫照会）を実装してください。詳細設計のシーケンスと入力検証マトリクスに従って、API Route／Server Action／Repository／Vitest テストを一式、省略せず完全形で出してください。',
       lines: [
         '> US-001 リアルタイム在庫照会 を実装します',
         '  Read: design/detail/ + specification/stories/US-001.md',
@@ -1388,7 +1388,7 @@ Background Agent 3: モード切替「QAエンジニアモード」で単体・E
       { label: 'Cursor Background Agents（並列実行）', body: 'クラウド側で複数 Agent を並列起動。security-review / code-reviewer / qa-engineer の3者を同時に走らせ、結果を1つのレポートに統合する典型構成。' },
     ],
     execution: {
-      command: '@full-review 41',
+      command: 'PR #41 のソース一式について、Gherkin 受入基準を Vitest テストに変換して実行し、pass/fail を表で示してください。あわせて型エラー・不変性違反・例外処理の境界もレビューしてください。',
       lines: [
         '> Background Agents 3つを並列起動',
         '',
@@ -1522,7 +1522,7 @@ fi`,
       { label: 'Cursor 公式: Configuration Reference', body: 'agent.defaultModel / agent.autoRun / agent.allowedWritePaths / mcpServers など .cursor/settings.json の全項目は docs.cursor.com を参照。' },
     ],
     execution: {
-      command: '@setup-cicd',
+      command: '今回のリリース（US-001〜036 / マイグレーション1件）について、CI/CD パイプラインとデプロイ手順書を作成してください。ロールバック手順は手順書の冒頭に置き、環境変数チェックリストは落ちる順に並べてください。',
       lines: [
         '> 「DevOpsモード」に切替...',
         '  GitHub Actions ワークフロー生成 (ci.yml / cd.yml)',
@@ -1745,7 +1745,7 @@ Agent Mode で \`@incident-respond INC-YYYY-MM-DD\` で起動。
       { label: 'modes.profiles.prod-readonly（Cursor 設定）', body: 'cron 実行用プロファイル。autoRun: "never" + allowedWritePaths: [] で完全自律＋安全境界を両立。' },
     ],
     execution: {
-      command: '@health-check 24h（cron 起動）',
+      command: '毎朝9時に自動起動するルーチンを設定して、直近24時間のエラー率／p95レスポンス／CSV連携成否を reports/daily/YYYY-MM-DD.md にまとめてください。閾値（エラー率0.5% / p95 2.0s）を超えていれば Slack の #ops に通知してください。',
       lines: [
         '> 外部スケジューラ (cron / launchd) から cursor-agent --print 起動...',
         '  mode: prod-readonly',

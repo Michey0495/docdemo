@@ -82,6 +82,13 @@ code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; }
 /* ============================================
    Rail (sticky timeline)
 ============================================ */
+.rail-logo {
+  display: block;
+  width: 96px;
+  height: auto;
+  margin: 0 0 22px;
+  opacity: 0.95;
+}
 .rail-brand {
   font-size: 12px;
   letter-spacing: 0.18em;
@@ -925,9 +932,16 @@ code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; }
   color: var(--ink-3);
   font-size: 13px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
+}
+.footer-logo {
+  height: 22px;
+  width: auto;
+  opacity: 0.55;
+  margin: 0 auto;
 }
 .footer-summary {
   display: grid;
