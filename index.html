@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>要件定義から保守運用まで AI駆動開発デモ集 | 4つの進め方を比較</title>
+  <title>要件定義から保守運用まで AI駆動開発デモ集 | 5つの進め方を比較</title>
   <style>
     :root{
       --red:#c8102e; --red-deep:#97091f; --red-soft:#fdeeef; --red-line:#efc8cc;
@@ -33,7 +33,7 @@
     .scenario-meta{display:grid;grid-template-columns:repeat(2,auto);gap:6px 28px;
       font-size:12px;color:var(--ink-3);align-content:start;}
     .scenario-meta b{color:var(--ink);font-weight:700;margin-left:8px;}
-    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;}
     .card{display:flex;flex-direction:column;border:1px solid var(--line);
       border-radius:var(--r-lg);padding:26px 26px 22px;transition:all var(--t);
       background:var(--bg);}
@@ -67,7 +67,7 @@
   <div class="wrap">
     <img class="hub-logo" src="./assets/givery-logo.png" alt="Givery">
     <span class="tag">商談用 / 説明資料</span>
-    <h1>同じ案件を、<em>4つの進め方</em>で<br>要件定義から保守運用まで通す</h1>
+    <h1>同じ案件を、<em>5つの進め方</em>で<br>要件定義から保守運用まで通す</h1>
     <p class="lead">1件の架空案件を題材に、顧客ヒアリングから本番運用までの10工程を、開発スタイル別に再現したデモ集です。どのカードも入力・操作・設定・成果が工程ごとに並び、実際の設定ファイルやプロンプトをそのまま確認できます。</p>
     <p class="note">CLI／エディタ／ブラウザチャットで、同じ成果物にどう到達するかを横並びで比較できます。気になる進め方のカードから入ってください。</p>
 
@@ -130,6 +130,18 @@
           <li>導入ゼロ、ブラウザだけで完結</li>
           <li>Projects / Gem / Copilot に指示を常駐</li>
           <li>4ツール併用で自動連鎖の弱さを補う</li>
+        </ul>
+        <span class="card-cta">この進め方を見る</span>
+      </a>
+
+      <a class="card" href="./copilot/">
+        <div class="card-kicker">VSCode 統合</div>
+        <div class="card-title">GitHub Copilot</div>
+        <div class="card-sub">copilot-instructions・カスタムチャットモード・プロンプトファイルで運用</div>
+        <ul class="card-points">
+          <li>.github/copilot-instructions.md に規約を集約</li>
+          <li>chatmode と prompt file で工程を分担</li>
+          <li>Actions と Coding Agent で自動化</li>
         </ul>
         <span class="card-cta">この進め方を見る</span>
       </a>
