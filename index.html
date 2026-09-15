@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>要件定義から保守運用まで AI駆動開発デモ集 | 5つの進め方を比較</title>
+  <title>AI駆動開発デモ　〜文字起こしから保守運用までAIを活用したハーネス設計〜</title>
   <style>
     :root{
       --red:#c8102e; --red-deep:#97091f; --red-soft:#fdeeef; --red-line:#efc8cc;
@@ -54,6 +54,12 @@
       border-right:2px solid #fff;transform:rotate(45deg);}
     .hub-logo{display:block;width:120px;height:auto;margin:0 0 32px;opacity:0.92;}
     .hub-footer-logo{height:22px;width:auto;opacity:0.55;margin:0 auto;}
+    .dl-section{margin-top:40px;border:1px solid var(--line);border-radius:var(--r-lg);padding:24px 26px;background:var(--bg-soft);}
+    .dl-head{font-size:15px;font-weight:800;margin-bottom:6px;}
+    .dl-note{font-size:13px;color:var(--ink-3);margin:0 0 14px;}
+    .dl-links{display:flex;flex-wrap:wrap;gap:10px;}
+    .dl-links a{font-size:13px;font-weight:700;padding:9px 16px;border:1px solid var(--ink-2);border-radius:999px;background:var(--bg);transition:all var(--t);}
+    .dl-links a:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
     .footer{margin-top:64px;padding-top:22px;border-top:1px solid var(--line);
       display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink-4);flex-wrap:wrap;gap:8px;}
     @media (max-width:760px){
@@ -67,7 +73,7 @@
   <div class="wrap">
     <img class="hub-logo" src="./assets/givery-logo.png" alt="Givery">
     <span class="tag">商談用 / 説明資料</span>
-    <h1>同じ案件を、<em>5つの進め方</em>で<br>要件定義から保守運用まで通す</h1>
+    <h1>AI駆動開発デモ<br><em>〜文字起こしから保守運用までAIを活用したハーネス設計〜</em></h1>
     <p class="lead">1件の架空案件を題材に、顧客ヒアリングから本番運用までの10工程を、開発スタイル別に再現したデモ集です。どのカードも入力・操作・設定・成果が工程ごとに並び、実際の設定ファイルやプロンプトをそのまま確認できます。</p>
     <p class="note">CLI／エディタ／ブラウザチャットで、同じ成果物にどう到達するかを横並びで比較できます。気になる進め方のカードから入ってください。</p>
 
@@ -145,6 +151,18 @@
         </ul>
         <span class="card-cta">この進め方を見る</span>
       </a>
+    </div>
+
+    <div class="dl-section">
+      <div class="dl-head">ハーネス一式のダウンロード</div>
+      <p class="dl-note">各ページに登場する設定ファイルの統合完全版です。展開してプロジェクト直下に置くと、そのまま同じ運用を再現できます。</p>
+      <div class="dl-links">
+        <a href="./claudecode/claudecode-harness.zip" download>Claude Code 版</a>
+        <a href="./codex/codex-harness.zip" download>Codex CLI 版</a>
+        <a href="./cursor/cursor-harness.zip" download>Cursor 版</a>
+        <a href="./browser/browser-harness.zip" download>ブラウザAIチャット版</a>
+        <a href="./copilot/copilot-harness.zip" download>GitHub Copilot 版</a>
+      </div>
     </div>
 
     <div class="footer">

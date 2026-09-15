@@ -1,0 +1,26 @@
+{
+  "agent.defaultModel": "claude-sonnet-4.5",
+  "agent.reasoningEffort": "high",
+  "agent.autoRun": "ask",
+  "agent.allowedWritePaths": [
+    "./docs",
+    "./specification",
+    "./design",
+    "./src",
+    "./reports",
+    "./incidents"
+  ],
+  "agent.allowNetwork": false,
+  "agent.dangerousCommandsRequireConfirm": true,
+  "agent.shellEnvFilter": {
+    "exclude": ["*KEY*", "*TOKEN*", "*SECRET*"]
+  },
+  "agent.terminalEnabled": true,
+  "agent.parallelEnabled": true,
+  "modes.profiles": {
+    "strict": {
+      "agent.autoRun": "never",
+      "agent.allowedWritePaths": []
+    }
+  }
+}

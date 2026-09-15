@@ -1,0 +1,94 @@
+# 架空株式会社 在庫管理システム - Codex CLI プロジェクト設定（統合版）
+# デモの各工程で抜粋表示していた設定を1本にまとめたもの
+
+model = "gpt-5.5-codex-spark"
+model_reasoning_effort = "high"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+writable_roots = ["./docs", "./specification", "./design", "./src", "./reports", "./incidents"]
+network_access = false
+exclude_tmpdir_env_var = false
+
+[shell_environment_policy]
+inherit = "all"
+exclude = ["*KEY*", "*TOKEN*", "*SECRET*"]
+
+[features]
+codex_hooks = true
+shell_tool = true
+multi_agent = true
+
+# 設計レビュー時など、書込を止めたいときに `codex --profile strict`
+[profiles.strict]
+approval_policy = "untrusted"
+sandbox_mode = "read-only"
+
+notify = ["python3", "${CODEX_PROJECT_DIR}/.codex/notify.py"]
+
+# ---- Hooks: ガードレール ----
+
+# 危険コマンド（push --force / reset --hard / rm -rf / sudo）を物理遮断
+[[hooks.PreToolUse]]
+matcher = "^shell$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = '${CODEX_PROJECT_DIR}/.codex/hooks/block-dangerous.sh'
+timeout = 10
+statusMessage = "危険コマンドを検査"
+
+# docs/ に WARN/ERROR が残ったままの commit を拒否
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = '''
+if echo "$CODEX_TOOL_INPUT" | grep -q 'git commit' && grep -rE '\[(WARN|ERROR)\]' docs/ >/dev/null 2>&1; then
+  echo 'docs/ に WARN/ERROR が残っています。レビュー指摘を解消してから commit してください' >&2
+  exit 2
+fi
+'''
+timeout = 10
+statusMessage = "docs/ の WARN/ERROR を点検"
+
+# 機密値の混入をファイル書込前に検知
+[[hooks.PreToolUse]]
+matcher = "^(apply_patch|edit_file|write_file)$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = '${CODEX_PROJECT_DIR}/.codex/hooks/check-secrets.sh'
+timeout = 10
+statusMessage = "機密値の混入を検査"
+
+# 編集のたびに typecheck / lint を自動実行
+[[hooks.PostToolUse]]
+matcher = "^(apply_patch|edit_file|write_file)$"
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "npm run typecheck --silent"
+timeout = 60
+
+[[hooks.PostToolUse.hooks]]
+type = "command"
+command = "npm run lint:fix --silent"
+timeout = 60
+
+# 完了報告の前にテストと IaC 変更を最終確認
+[[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = "npm test --silent"
+timeout = 180
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = '''
+if git diff --name-only HEAD~1 2>/dev/null | grep -q '^infra/'; then
+  echo 'IaC変更を検知しました。terraform plan の結果を確認してください' >&2
+fi
+'''
+timeout = 15
+statusMessage = "infra/ 配下の変更を点検"

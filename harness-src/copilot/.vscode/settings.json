@@ -1,0 +1,29 @@
+{
+  "chat.agent.enabled": true,
+  "chat.promptFiles": true,
+  "chat.modeFilesLocations": {
+    ".github/chatmodes": true
+  },
+  "chat.promptFilesLocations": {
+    ".github/prompts": true
+  },
+  "chat.tools.terminal.autoApprove": {
+    "npm run typecheck": true,
+    "npm run lint": true,
+    "npm test": true,
+    "git status": true,
+    "git diff": true,
+    "git checkout -b": true,
+    "git commit": true,
+    "gh pr create": true,
+    "git push --force": false,
+    "git reset --hard": false,
+    "rm -rf": false,
+    "sudo": false
+  },
+  "chat.editing.autoAcceptDelay": 0,
+  "files.exclude": {
+    ".env": true,
+    "**/secrets/**": true
+  }
+}

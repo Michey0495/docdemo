@@ -1,0 +1,31 @@
+{
+  "servers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "datadog": {
+      "command": "npx",
+      "args": ["-y", "@datadog/mcp-server-datadog"],
+      "env": {
+        "DD_API_KEY": "${input:dd-api-key}",
+        "DD_APP_KEY": "${input:dd-app-key}",
+        "DD_SITE": "datadoghq.com"
+      }
+    },
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-slack"],
+      "env": { "SLACK_BOT_TOKEN": "${input:slack-token}" }
+    }
+  },
+  "inputs": [
+    { "id": "dd-api-key", "type": "promptString", "description": "Datadog API Key", "password": true },
+    { "id": "dd-app-key", "type": "promptString", "description": "Datadog App Key", "password": true },
+    { "id": "slack-token", "type": "promptString", "description": "Slack Bot Token", "password": true }
+  ]
+}

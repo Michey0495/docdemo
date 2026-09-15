@@ -1,0 +1,40 @@
+# ~/.codex/config.toml に追記する MCP サーバー定義（統合版）
+# ユーザーレベル設定のため、この _user-level/ 配下はプロジェクトではなくホームディレクトリに反映する
+
+[mcp_servers.github]
+enabled = true
+command = "docker"
+args = [
+  "run", "-i", "--rm",
+  "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+  "ghcr.io/github/github-mcp-server",
+]
+env = { GITHUB_PERSONAL_ACCESS_TOKEN = "${GITHUB_TOKEN}" }
+startup_timeout_sec = 30
+enabled_tools = ["create_pr", "list_issues", "comment_issue"]
+
+[mcp_servers.playwright]
+enabled = true
+command = "npx"
+args = ["-y", "@playwright/mcp@latest"]
+startup_timeout_sec = 60
+enabled_tools = [
+  "browser_navigate",
+  "browser_click",
+  "browser_snapshot",
+  "browser_take_screenshot",
+]
+
+[mcp_servers.datadog]
+enabled = true
+command = "npx"
+args = ["-y", "@datadog/mcp-server-datadog"]
+env = { DD_API_KEY = "${DD_API_KEY}", DD_APP_KEY = "${DD_APP_KEY}", DD_SITE = "datadoghq.com" }
+startup_timeout_sec = 30
+
+[mcp_servers.slack]
+enabled = true
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-slack"]
+env = { SLACK_BOT_TOKEN = "${SLACK_BOT_TOKEN}" }
+startup_timeout_sec = 30

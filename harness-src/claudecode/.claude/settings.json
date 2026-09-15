@@ -1,0 +1,83 @@
+{
+  "model": "claude-opus-4-7",
+  "includeCoAuthoredBy": true,
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(docs/**)",
+      "Write(specification/**)",
+      "Write(design/**)",
+      "Write(src/**)",
+      "Edit(src/**)",
+      "Write(reports/**)",
+      "Write(incidents/**)",
+      "AskUserQuestion",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm test:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git checkout -b:*)",
+      "Bash(git commit:*)",
+      "Bash(gh pr create:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/secrets/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-dangerous.sh"
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git commit' && grep -rE '\\[(WARN|ERROR)\\]' docs/ >/dev/null 2>&1; then echo 'docs/ に WARN/ERROR が残っています。レビュー指摘を解消してから commit してください' >&2; exit 2; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/check-secrets.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "npm run typecheck --silent" },
+          { "type": "command", "command": "npm run lint:fix --silent" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "npm test --silent" },
+          {
+            "type": "command",
+            "command": "if git diff --name-only HEAD~1 2>/dev/null | grep -q '^infra/'; then echo 'IaC変更を検知しました。terraform plan の結果を確認してください'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
